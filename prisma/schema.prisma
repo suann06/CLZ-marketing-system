@@ -1,0 +1,143 @@
+// Phase 1 schema only. See docs/architecture.md for the tables deferred to
+// Phases 2-4 (creatives, leads, whatsapp_messages, outcomes, funnel_events) —
+// they attach to `Campaign.id` later without touching these models.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Connection URL lives in prisma.config.ts (Prisma 7 removed schema-level
+// datasource.url) and in the PrismaPg adapter in src/server/db/client.ts.
+datasource db {
+  provider = "postgresql"
+}
+
+// Reserves the full campaign lifecycle even though Phase 1 only implements
+// draft -> confirmed. Later values are unused by Phase 1 code.
+enum CampaignStatus {
+  draft
+  confirmed
+  content_ready
+  live
+  active
+  closed
+}
+
+// Every mutating action in the system is stamped with who/what did it, so
+// human/AI/system responsibility is queryable rather than just conventional.
+enum ActorType {
+  human
+  ai
+  system
+}
+
+// One uploaded file = one independent dataset. Datasets are never merged,
+// cleaned, matched, or deduplicated against each other.
+model Dataset {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String
+  sourceFilename String   @map("source_filename")
+  importedById   String?  @map("imported_by_id") @db.Uuid // references auth.users, no FK (separate schema)
+  importedAt     DateTime @default(now()) @map("imported_at")
+  rowCount       Int      @map("row_count")
+
+  buildings         Building[]
+  campaignDatasets  CampaignDataset[]
+  campaignBuildings CampaignBuilding[]
+
+  @@map("datasets")
+}
+
+// Always scoped to exactly one dataset. Never deduplicated against another
+// dataset's buildings.
+model Building {
+  id             String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  datasetId      String  @map("dataset_id") @db.Uuid
+  name           String
+  address        String?
+  lat            Float?
+  lng            Float?
+  unitCount      Int?    @map("unit_count")
+  // Unmapped source columns from the import file, kept as-is rather than
+  // forcing a rigid import schema.
+  rawAttributes  Json    @default("{}") @map("raw_attributes")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  dataset           Dataset            @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  campaignBuildings CampaignBuilding[]
+
+  @@index([datasetId])
+  @@map("buildings")
+}
+
+model Campaign {
+  id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name             String
+  productPromotion String         @map("product_promotion")
+  // { amount, currency, terms } — official facts only. Never merged with
+  // differentiators; Phase 2's AI prompt-building relies on this separation.
+  officialPricing  Json           @map("official_pricing")
+  // CLZ-specific marketing angles, kept structurally separate from
+  // officialPricing.
+  differentiators  Json           @default("[]")
+  startDate        DateTime       @map("start_date") @db.Date
+  endDate          DateTime       @map("end_date") @db.Date
+  status           CampaignStatus @default(draft)
+  createdById      String?        @map("created_by_id") @db.Uuid // references auth.users
+  confirmedById    String?        @map("confirmed_by_id") @db.Uuid // references auth.users
+  confirmedAt      DateTime?      @map("confirmed_at")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  campaignDatasets  CampaignDataset[]
+  campaignBuildings CampaignBuilding[]
+
+  @@map("campaigns")
+}
+
+// Which dataset(s) a campaign targets. Datasets are selected independently —
+// this table never implies any merging between them.
+model CampaignDataset {
+  campaignId String @map("campaign_id") @db.Uuid
+  datasetId  String @map("dataset_id") @db.Uuid
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  dataset  Dataset  @relation(fields: [datasetId], references: [id], onDelete: Restrict)
+
+  @@id([campaignId, datasetId])
+  @@map("campaign_datasets")
+}
+
+// Selected buildings for a campaign. datasetId is kept explicit alongside
+// buildingId (even though it's derivable via Building.datasetId) so dataset
+// origin is visible directly in this table — a guardrail against ever
+// treating cross-dataset selections as one merged pool.
+model CampaignBuilding {
+  campaignId String @map("campaign_id") @db.Uuid
+  datasetId  String @map("dataset_id") @db.Uuid
+  buildingId String @map("building_id") @db.Uuid
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  dataset  Dataset  @relation(fields: [datasetId], references: [id], onDelete: Restrict)
+  building Building @relation(fields: [buildingId], references: [id], onDelete: Restrict)
+
+  @@id([campaignId, buildingId])
+  @@index([campaignId, datasetId])
+  @@map("campaign_buildings")
+}
+
+// Generic audit trail. Phase 1 only ever writes actorType = human; the shape
+// exists now so Phase 2/3 AI/system actions need no schema change later.
+model ActivityLog {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entityType String    @map("entity_type")
+  entityId   String    @map("entity_id") @db.Uuid
+  action     String
+  actorType  ActorType @map("actor_type")
+  actorId    String?   @map("actor_id") @db.Uuid // references auth.users when actorType = human
+  metadata   Json      @default("{}")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([entityType, entityId])
+  @@map("activity_log")
+}
