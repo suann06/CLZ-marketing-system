@@ -59,6 +59,29 @@ enum LaunchPlatform {
   tiktok
 }
 
+// Phase 3B assigns only "new" — every Lead starts here. hot/warm/cold are
+// reserved for the (not-yet-built) AI classification phase; no code in this
+// phase ever writes those values.
+enum LeadStatus {
+  new
+  hot
+  warm
+  cold
+}
+
+// Phase 3B never advances this past its default — no application workflow
+// exists yet. Reserved for a later phase.
+enum ApplicationStatus {
+  not_started
+  in_progress
+  submitted
+}
+
+enum WhatsAppMessageDirection {
+  inbound
+  outbound
+}
+
 // Independent from ContentSetStatus — this describes publishing state, not
 // content review state. "approved" (ContentSet) is not the same concept as
 // "live" (Launch).
@@ -134,6 +157,7 @@ model Campaign {
   contentSets ContentSet[]
   launches Launch[]
   acquisitionEvents AcquisitionEvent[]
+  leads Lead[]
 
   @@map("campaigns")
 }
@@ -284,10 +308,113 @@ model AcquisitionEvent {
   createdAt DateTime @default(now()) @map("created_at")
 
   campaignRecord Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  leads          Lead[]
 
   @@index([campaignId])
   @@index([createdAt])
   @@map("acquisition_events")
+}
+
+// Phase 3B: data foundation only. A Lead is campaign-scoped — the same
+// phone number contacting two different campaigns produces two separate
+// Lead rows; leads are never merged globally across campaigns. Reused via
+// (campaignId, phone) — see lead-service.ts. status starts at "new" and
+// stays there in this phase; no AI classification exists yet.
+// applicationStatus/agentId/handoverAt are reserved for later phases
+// (application workflow / human handover) — this phase never writes to
+// them beyond their defaults.
+model Lead {
+  id                 String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  campaignId         String             @map("campaign_id") @db.Uuid
+  acquisitionEventId String?            @map("acquisition_event_id") @db.Uuid
+  phone              String
+  name               String?
+  customerInfo       Json               @default("{}") @map("customer_info")
+  status             LeadStatus         @default(new)
+  handoverAt         DateTime?          @map("handover_at")
+  agentId            String?            @map("agent_id") @db.Uuid // references auth.users; unused until human handover phase
+  applicationStatus  ApplicationStatus  @default(not_started) @map("application_status")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+
+  campaign         Campaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  acquisitionEvent AcquisitionEvent? @relation(fields: [acquisitionEventId], references: [id], onDelete: SetNull)
+  statusHistory    LeadStatusHistory[]
+  threads          WhatsAppThread[]
+  messages         WhatsAppMessage[]
+
+  @@index([campaignId])
+  @@index([phone])
+  @@index([campaignId, phone])
+  @@map("leads")
+}
+
+// Append-only. Phase 3B writes exactly one row per Lead (the initial
+// fromStatus=null -> toStatus=new transition, actorType=system) — no
+// classification logic runs in this phase, so no further rows are written
+// here yet.
+model LeadStatusHistory {
+  id         String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  leadId     String      @map("lead_id") @db.Uuid
+  fromStatus LeadStatus? @map("from_status")
+  toStatus   LeadStatus  @map("to_status")
+  reason     String?
+  actorType  ActorType   @map("actor_type")
+  actorId    String?     @map("actor_id") @db.Uuid
+  createdAt  DateTime    @default(now()) @map("created_at")
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([leadId, createdAt])
+  @@map("lead_status_history")
+}
+
+// One active thread per Lead in Phase 3B — no multi-thread conversation
+// management yet. (provider, externalThreadId) identifies the thread on
+// the provider's side; provider is a free-text tag ("stub" in this phase)
+// mirroring Launch.provider, not an enum, so a real adapter needs no
+// migration to register itself.
+model WhatsAppThread {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  leadId           String   @map("lead_id") @db.Uuid
+  provider         String
+  externalThreadId String   @map("external_thread_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  lead     Lead              @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  messages WhatsAppMessage[]
+
+  @@index([leadId])
+  @@index([provider, externalThreadId])
+  @@map("whatsapp_threads")
+}
+
+// externalMessageId is provider-owned and never treated as our identity —
+// same reasoning as Launch.externalCampaignId/externalAdId. It is used
+// only for idempotency (see whatsapp-service.ts): when present, a retried
+// webhook delivery with the same externalMessageId must not create a
+// second row. leadId is denormalized alongside threadId (thread already
+// implies lead) purely to make lead-scoped message queries cheap without a
+// join — same shape as CampaignBuilding keeping datasetId explicit.
+model WhatsAppMessage {
+  id                 String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  threadId           String                    @map("thread_id") @db.Uuid
+  leadId             String                    @map("lead_id") @db.Uuid
+  direction          WhatsAppMessageDirection
+  content            String
+  externalMessageId  String?                   @map("external_message_id")
+  metadata           Json                      @default("{}")
+  createdAt          DateTime                  @default(now()) @map("created_at")
+
+  thread WhatsAppThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  lead   Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
+  @@index([leadId, createdAt])
+  @@index([externalMessageId])
+  @@map("whatsapp_messages")
 }
 
 // Which dataset(s) a campaign targets. Datasets are selected independently —
