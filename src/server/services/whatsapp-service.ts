@@ -63,7 +63,11 @@ export async function storeInboundMessage(input: StoreInboundMessageInput) {
       where: { threadId: thread.id, externalMessageId: input.externalMessageId },
     });
     if (existingMessage) {
-      return { thread, message: existingMessage };
+      // isNewMessage: false tells the caller (the webhook route) this
+      // delivery is a retry of an already-processed inbound message — used
+      // in Phase 3C to avoid triggering a second AI response for the same
+      // message. See conversation-service.ts / the webhook route.
+      return { thread, message: existingMessage, isNewMessage: false };
     }
   }
 
@@ -90,5 +94,5 @@ export async function storeInboundMessage(input: StoreInboundMessageInput) {
     },
   });
 
-  return { thread, message };
+  return { thread, message, isNewMessage: true };
 }

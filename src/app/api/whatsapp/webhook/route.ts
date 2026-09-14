@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { whatsAppWebhookSchema } from "@/server/validation/whatsapp-webhook-schema";
 import { findOrCreateLead } from "@/server/services/lead-service";
 import { storeInboundMessage } from "@/server/services/whatsapp-service";
+import { processInboundMessage, ConversationAiError } from "@/server/services/conversation-service";
 import { CampaignNotFoundError } from "@/server/services/campaign-service";
 
 export const dynamic = "force-dynamic";
@@ -15,9 +16,17 @@ export const dynamic = "force-dynamic";
 // request is rejected with 400 rather than guessing at attribution from
 // phone number or any heuristic — no Lead is created without it.
 //
-// Data foundation only: identify/create the campaign-scoped Lead, then
-// identify/create its WhatsAppThread, then store the inbound message. No
-// AI reply, no outbound send, no classification.
+// Phase 3B behavior (find/create Lead -> find/create Thread -> store
+// inbound message) is preserved exactly. Phase 3C adds one step after the
+// inbound message is stored: hand off to conversation-service.ts for AI
+// processing, but ONLY when the inbound message was newly created —
+// isNewMessage: false means this delivery is a retry of an
+// already-processed message (see whatsapp-service.ts), and must not
+// trigger a second AI response.
+//
+// The route stays thin: no Prisma calls here, no AI/WhatsApp-provider
+// calls here — everything beyond validation is delegated to the service
+// layer.
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const parsed = whatsAppWebhookSchema.safeParse(body);
@@ -34,7 +43,7 @@ export async function POST(request: Request) {
       acquisitionEventId: input.acquisitionEventId ?? null,
     });
 
-    const { thread, message } = await storeInboundMessage({
+    const { thread, message, isNewMessage } = await storeInboundMessage({
       leadId: lead.id,
       provider: input.provider,
       externalThreadId: input.externalThreadId,
@@ -42,7 +51,26 @@ export async function POST(request: Request) {
       externalMessageId: input.externalMessageId ?? null,
     });
 
-    return NextResponse.json({ lead, thread, message }, { status: 201 });
+    if (!isNewMessage) {
+      return NextResponse.json({ lead, thread, message, conversation: null }, { status: 201 });
+    }
+
+    try {
+      const conversation = await processInboundMessage({ leadId: lead.id, threadId: thread.id });
+      return NextResponse.json({ lead, thread, message, conversation }, { status: 201 });
+    } catch (err) {
+      if (err instanceof ConversationAiError) {
+        // The inbound message above is already committed regardless of
+        // this outcome — AI failure never deletes it. Surfaced as 502
+        // (upstream AI processing failed), distinct from the 400/404
+        // validation/attribution failures below.
+        return NextResponse.json(
+          { lead, thread, message, conversation: null, error: err.message },
+          { status: 502 },
+        );
+      }
+      throw err;
+    }
   } catch (err) {
     if (err instanceof CampaignNotFoundError) {
       return NextResponse.json({ error: err.message }, { status: 404 });

@@ -170,6 +170,32 @@ describe("storeInboundMessage", () => {
     expect(messageCreate).not.toHaveBeenCalled();
   });
 
+  // isNewMessage is what Phase 3C's webhook route uses to decide whether to
+  // trigger conversation-service.ts — a duplicate delivery must never
+  // trigger a second AI response. See conversation-service.test.ts and the
+  // webhook route.
+  it("reports isNewMessage: true when a new inbound message is created", async () => {
+    threadFindFirst.mockResolvedValue({ id: "thread-1" });
+    messageFindFirst.mockResolvedValue(null);
+
+    const result = await storeInboundMessage({ leadId: "lead-1", content: "hello" });
+
+    expect(result.isNewMessage).toBe(true);
+  });
+
+  it("reports isNewMessage: false for a duplicate externalMessageId delivery", async () => {
+    threadFindFirst.mockResolvedValue({ id: "thread-1" });
+    messageFindFirst.mockResolvedValue({ id: "message-existing", externalMessageId: "wamid.123" });
+
+    const result = await storeInboundMessage({
+      leadId: "lead-1",
+      content: "hello",
+      externalMessageId: "wamid.123",
+    });
+
+    expect(result.isNewMessage).toBe(false);
+  });
+
   it("creates a new row (no unsafe content-based dedup) when externalMessageId is absent", async () => {
     threadFindFirst.mockResolvedValue({ id: "thread-1" });
 
