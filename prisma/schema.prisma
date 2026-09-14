@@ -93,6 +93,14 @@ enum FollowUpStatus {
   cancelled
 }
 
+// No "open"/"pending" value by design — a Sale row's mere existence is the
+// resolution event (Phase 4A trigger is "Application resolved"). Only ever
+// written by sale-service.ts, never by AI/system code.
+enum SaleStatus {
+  won
+  lost
+}
+
 // Independent from ContentSetStatus — this describes publishing state, not
 // content review state. "approved" (ContentSet) is not the same concept as
 // "live" (Launch).
@@ -169,6 +177,7 @@ model Campaign {
   launches Launch[]
   acquisitionEvents AcquisitionEvent[]
   leads Lead[]
+  sales Sale[]
 
   @@map("campaigns")
 }
@@ -354,6 +363,7 @@ model Lead {
   threads          WhatsAppThread[]
   messages         WhatsAppMessage[]
   followUps        FollowUp[]
+  sale             Sale?
 
   @@index([campaignId])
   @@index([phone])
@@ -464,6 +474,37 @@ model FollowUp {
   @@index([scheduledAt])
   @@index([leadId, day])
   @@map("follow_ups")
+}
+
+// Phase 4A: the final sales outcome for a Lead, recorded by a human agent
+// once the Lead's application has been submitted. At most one Sale per
+// Lead (leadId is unique) — a correction (e.g. won -> lost) updates this
+// same row rather than creating a new one; see sale-service.ts's
+// updateSaleOutcome(). campaignId is denormalized from Lead.campaignId at
+// creation time — safe because Leads are campaign-scoped and never move
+// between campaigns — so campaign-level aggregation never needs a join
+// through Lead. won/lost cross-field consistency (saleValue required+
+// positive & lostReason null for won; reverse for lost) is enforced in
+// sale-schema.ts / sale-service.ts, not a DB constraint — matching this
+// project's existing convention of enforcing such invariants at the
+// application layer (Launch's idempotency key, FollowUp's allowed day
+// values).
+model Sale {
+  id         String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  leadId     String     @unique @map("lead_id") @db.Uuid
+  campaignId String     @map("campaign_id") @db.Uuid
+  status     SaleStatus
+  saleValue  Decimal?   @map("sale_value") @db.Decimal(12, 2)
+  lostReason String?    @map("lost_reason")
+  closedAt   DateTime   @map("closed_at")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  lead     Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@map("sales")
 }
 
 // Which dataset(s) a campaign targets. Datasets are selected independently —
