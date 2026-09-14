@@ -31,6 +31,45 @@ enum ActorType {
   system
 }
 
+// draft: freshly (re)generated, awaiting human review.
+// approved: the live/active version for this campaign (human review phase).
+// archived: superseded — either replaced by a newer draft, or by a newer
+// approved version. Terminal; never re-activated.
+enum MarketingStrategyStatus {
+  draft
+  approved
+  archived
+}
+
+// Same lifecycle shape as MarketingStrategyStatus, kept as its own enum
+// rather than shared — ContentSet and MarketingStrategy are independently
+// versioned entities with their own lifecycles.
+enum ContentSetStatus {
+  draft
+  approved
+  archived
+}
+
+// facebook/instagram both route through the Meta provider slot; tiktok its
+// own — see src/server/providers/ads/provider-registry.ts. WhatsApp is
+// deliberately excluded — it is never a publishing target here.
+enum LaunchPlatform {
+  facebook
+  instagram
+  tiktok
+}
+
+// Independent from ContentSetStatus — this describes publishing state, not
+// content review state. "approved" (ContentSet) is not the same concept as
+// "live" (Launch).
+enum LaunchStatus {
+  pending
+  launching
+  live
+  failed
+  cancelled
+}
+
 // One uploaded file = one independent dataset. Datasets are never merged,
 // cleaned, matched, or deduplicated against each other.
 model Dataset {
@@ -91,8 +130,134 @@ model Campaign {
 
   campaignDatasets  CampaignDataset[]
   campaignBuildings CampaignBuilding[]
+  marketingStrategies MarketingStrategy[]
+  contentSets ContentSet[]
+  launches Launch[]
 
   @@map("campaigns")
+}
+
+// Phase 2A.2: AI-generated marketing strategy for a confirmed campaign.
+// Versioned rather than overwritten — regenerating creates a new row, never
+// mutates a prior one. See campaign-service.ts / marketing-strategy-service.ts
+// for the exact lifecycle rules.
+model MarketingStrategy {
+  id            String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  campaignId    String                  @map("campaign_id") @db.Uuid
+  version       Int
+  status        MarketingStrategyStatus @default(draft)
+
+  // Validated AI output (see server/ai/schemas/marketing-strategy-output.ts).
+  content       Json
+  // Exact MarketingStrategyInput snapshot used to generate this version —
+  // auditability, independent of any later change to how the brief/analysis
+  // is computed.
+  inputSnapshot Json                    @map("input_snapshot")
+
+  generatedById String?   @map("generated_by_id") @db.Uuid // references auth.users
+  approvedById  String?   @map("approved_by_id") @db.Uuid  // references auth.users; unused until the human-review phase
+  approvedAt    DateTime? @map("approved_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contentSets ContentSet[]
+
+  @@unique([campaignId, version])
+  @@index([campaignId])
+  @@map("marketing_strategies")
+}
+
+// Phase 2B: AI-generated platform-specific content (Facebook, Instagram,
+// TikTok, WhatsApp) for a campaign, derived from its approved
+// MarketingStrategy. Same versioned draft/approved/archived shape as
+// MarketingStrategy — editing/approval behavior belongs to Phase 2C, not
+// implemented here; approvedById/approvedAt exist now purely so that phase
+// needs no further migration.
+model ContentSet {
+  id                  String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  campaignId          String           @map("campaign_id") @db.Uuid
+  marketingStrategyId String           @map("marketing_strategy_id") @db.Uuid
+  version             Int
+  status              ContentSetStatus @default(draft)
+
+  // Validated AI output (see server/ai/schemas/content-set-output.ts):
+  // { facebook: Variant[], instagram: Variant[], tiktok: Variant[], whatsapp: Variant[] }
+  content       Json
+  // Exact ContentGenerationInput snapshot used to generate this version —
+  // auditability, independent of any later change to the strategy/brief.
+  inputSnapshot Json             @map("input_snapshot")
+
+  generatedById String?   @map("generated_by_id") @db.Uuid // references auth.users
+  approvedById  String?   @map("approved_by_id") @db.Uuid  // references auth.users; unused until Phase 2C
+  approvedAt    DateTime? @map("approved_at")               // unused until Phase 2C
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  campaign          Campaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  marketingStrategy MarketingStrategy @relation(fields: [marketingStrategyId], references: [id], onDelete: Restrict)
+  launches          Launch[]
+
+  @@unique([campaignId, version])
+  @@index([campaignId])
+  @@index([marketingStrategyId])
+  @@map("content_sets")
+}
+
+// Phase 2D: a single platform publishing attempt for one human-selected
+// ContentVariant from an approved ContentSet. One row per platform per
+// logical attempt — Facebook and Instagram are always separate rows even
+// though both route through the same Meta provider slot. Never mutates
+// Campaign/ContentSet/MarketingStrategy; those stay immutable inputs.
+//
+// idempotencyKey is deterministic (campaignId + contentSetId + platform +
+// variantIndex) — the "logical launch target". It is NOT unique across all
+// rows: a failed/cancelled attempt is preserved forever, and an explicit
+// human retry creates a brand new row with the same key. Uniqueness of
+// "at most one active attempt per logical target" is an application-level
+// invariant enforced in launch-service.ts (matching how "at most one
+// approved MarketingStrategy/ContentSet per campaign" is enforced there
+// too), not a DB constraint.
+//
+// selectedVariant is a full snapshot of the chosen ContentVariant at launch
+// time — this record must stay interpretable even if ContentSet's schema
+// changes later, same reasoning as inputSnapshot elsewhere.
+model Launch {
+  id                 String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  campaignId         String         @map("campaign_id") @db.Uuid
+  contentSetId       String         @map("content_set_id") @db.Uuid
+  contentSetVersion  Int            @map("content_set_version")
+  platform           LaunchPlatform
+  variantIndex       Int            @map("variant_index")
+  selectedVariant    Json           @map("selected_variant")
+  status             LaunchStatus   @default(pending)
+
+  // Which adapter actually handled this — "stub" during Phase 2D, "meta" /
+  // "tiktok" once real adapters exist. Never treat externalCampaignId/
+  // externalAdId/externalCreativeId as our identity — they are opaque,
+  // provider-owned values, recorded only once a provider returns them.
+  provider           String?
+  externalCampaignId String? @map("external_campaign_id")
+  externalAdId       String? @map("external_ad_id")
+  externalCreativeId String? @map("external_creative_id")
+  failureReason      String? @map("failure_reason")
+
+  idempotencyKey String  @map("idempotency_key")
+  createdById    String? @map("created_by_id") @db.Uuid // references auth.users
+
+  launchedAt DateTime? @map("launched_at") // set only on transition to live
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  campaign   Campaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contentSet ContentSet @relation(fields: [contentSetId], references: [id], onDelete: Restrict)
+
+  @@index([campaignId])
+  @@index([contentSetId])
+  @@index([idempotencyKey])
+  @@map("launches")
 }
 
 // Which dataset(s) a campaign targets. Datasets are selected independently —

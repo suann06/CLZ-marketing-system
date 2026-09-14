@@ -4,6 +4,7 @@ import type {
   CampaignBasicsInput,
 } from "@/server/validation/campaign-schema";
 import { Prisma, CampaignStatus } from "@prisma/client";
+import { buildTargetingAnalysis, type TargetingAnalysis } from "@/server/services/targeting-analysis";
 
 export class CampaignNotFoundError extends Error {
   constructor(campaignId: string) {
@@ -283,7 +284,7 @@ export function resumeCampaignPath(campaign: {
   _count: { campaignDatasets: number; campaignBuildings: number };
 }): string {
   if (campaign.status !== CampaignStatus.draft) {
-    return `/campaigns/${campaign.id}/buildings`;
+    return `/campaigns/${campaign.id}/brief`;
   }
   if (!Array.isArray(campaign.differentiators) || campaign.differentiators.length === 0) {
     return `/campaigns/${campaign.id}/differentiators`;
@@ -313,11 +314,34 @@ export async function getCampaignDetail(campaignId: string) {
   return { campaign, datasets, buildings };
 }
 
+// Named type for getCampaignBrief()'s return value — type-only addition,
+// no behavior change. Lets downstream consumers (e.g. the Phase 2A.2
+// marketing-strategy service) reference this shape directly instead of
+// `Awaited<ReturnType<typeof getCampaignBrief>>`.
+export type CampaignBrief = {
+  campaignId: string;
+  status: CampaignStatus;
+  productPromotion: string;
+  officialPricing: Prisma.JsonValue;
+  differentiators: Prisma.JsonValue;
+  datasets: {
+    datasetId: string;
+    name: string;
+    sourceFilename: string;
+    rowCount: number;
+    selectedBuildingCount: number;
+  }[];
+  targetingAnalysis: TargetingAnalysis;
+};
+
 // The only interface Phase 2's content-generation service is meant to call.
 // It never queries campaign/dataset/building tables directly — everything it
 // needs comes through this brief, keeping the phases decoupled. Only
-// confirmed-or-later campaigns can produce one.
-export async function getCampaignBrief(campaignId: string) {
+// confirmed-or-later campaigns can produce one. A confirmed campaign is
+// expected to already satisfy confirmCampaign()'s own invariants (>=1
+// dataset, >=1 building) — if it somehow doesn't, that's treated as an error
+// rather than silently returning an empty targeting context.
+export async function getCampaignBrief(campaignId: string): Promise<CampaignBrief> {
   const campaign = await getCampaignOrThrow(campaignId);
   if (campaign.status === CampaignStatus.draft) {
     throw new CampaignValidationError(
@@ -325,23 +349,53 @@ export async function getCampaignBrief(campaignId: string) {
     );
   }
 
-  const [datasetCount, buildings] = await Promise.all([
-    prisma.campaignDataset.count({ where: { campaignId } }),
+  const [campaignDatasets, campaignBuildings] = await Promise.all([
+    prisma.campaignDataset.findMany({
+      where: { campaignId },
+      include: { dataset: true },
+    }),
     prisma.campaignBuilding.findMany({
       where: { campaignId },
-      include: { building: { select: { id: true, name: true, address: true } } },
+      include: { building: true },
     }),
   ]);
 
+  if (campaignDatasets.length === 0 || campaignBuildings.length === 0) {
+    throw new CampaignValidationError(
+      "Confirmed campaign is missing required targeting data (dataset or building selection).",
+    );
+  }
+
+  const datasetNameById = new Map(
+    campaignDatasets.map((cd) => [cd.datasetId, cd.dataset.name]),
+  );
+
+  const targetingAnalysis = buildTargetingAnalysis(
+    campaignBuildings.map((cb) => ({
+      datasetId: cb.datasetId,
+      datasetName: datasetNameById.get(cb.datasetId) ?? cb.datasetId,
+      address: cb.building.address,
+      lat: cb.building.lat,
+      lng: cb.building.lng,
+      rawAttributes: cb.building.rawAttributes,
+    })),
+  );
+
   return {
     campaignId: campaign.id,
+    status: campaign.status,
     productPromotion: campaign.productPromotion,
     officialPricing: campaign.officialPricing,
     differentiators: campaign.differentiators,
-    targetingSummary: {
-      datasetCount,
-      buildingCount: buildings.length,
-      buildings: buildings.map((cb) => cb.building),
-    },
+    datasets: campaignDatasets.map((cd) => ({
+      datasetId: cd.datasetId,
+      name: cd.dataset.name,
+      sourceFilename: cd.dataset.sourceFilename,
+      rowCount: cd.dataset.rowCount,
+      selectedBuildingCount: campaignBuildings.filter(
+        (cb) => cb.datasetId === cd.datasetId,
+      ).length,
+    })),
+    targetingAnalysis,
   };
 }
