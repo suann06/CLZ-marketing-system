@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { StubAiProvider } from "@/server/providers/ai/stub-ai-provider";
 import { aiConversationOutputSchema } from "@/server/validation/ai-conversation-schema";
 import { leadClassificationOutputSchema } from "@/server/validation/lead-classification-schema";
+import { aiFeedbackExplanationOutputSchema } from "@/server/validation/ai-feedback-explanation-schema";
 
 const CAMPAIGN = { productPromotion: "Unlimited Fibre Plan", officialPricing: {}, differentiators: [] };
 
@@ -103,5 +104,108 @@ describe("StubAiProvider", () => {
       const parsed = leadClassificationOutputSchema.parse(raw);
       expect(parsed.reason.length).toBeGreaterThan(0);
     });
+  });
+
+  describe("explainFeedback", () => {
+    it("returns output that satisfies aiFeedbackExplanationOutputSchema", async () => {
+      const provider = new StubAiProvider();
+      const raw = await provider.explainFeedback({
+        topCampaigns: [],
+        topDatasets: [],
+        topCreatives: [],
+        signals: { highestObservedCampaignWinRate: { id: "c1", value: 0.75 } },
+      });
+      expect(aiFeedbackExplanationOutputSchema.safeParse(raw).success).toBe(true);
+    });
+
+    it("only echoes back the id/value pairs it was given, never inventing new ones", async () => {
+      const provider = new StubAiProvider();
+      const raw = await provider.explainFeedback({
+        topCampaigns: [],
+        topDatasets: [],
+        topCreatives: [],
+        signals: { highestObservedCampaignWinRate: { id: "campaign-xyz", value: 0.42 } },
+      });
+      const parsed = aiFeedbackExplanationOutputSchema.parse(raw);
+      expect(parsed.summary).toContain("campaign-xyz");
+      expect(parsed.summary).toContain("0.42");
+    });
+
+    it("never uses causal or guarantee language", async () => {
+      const provider = new StubAiProvider();
+      const raw = await provider.explainFeedback({
+        topCampaigns: [],
+        topDatasets: [],
+        topCreatives: [],
+        signals: {
+          highestObservedCampaignWinRate: { id: "c1", value: 1 },
+          highestObservedCampaignSalesValue: { id: "c2", value: "500.00" },
+          highestObservedDatasetWinRate: { id: "d1", value: 0.9 },
+          highestObservedCreativeWinRate: { id: "cr1", value: 0.5 },
+        },
+      });
+      const text = JSON.stringify(raw);
+      expect(text).not.toMatch(/\b(caused|causes|guarantee|predicted to succeed|best because of)\b/i);
+    });
+
+    it("handles an all-null signals object (no eligible sample anywhere) without throwing", async () => {
+      const provider = new StubAiProvider();
+      const raw = await provider.explainFeedback({
+        topCampaigns: [],
+        topDatasets: [],
+        topCreatives: [],
+        signals: {
+          highestObservedCampaignWinRate: null,
+          highestObservedCampaignSalesValue: null,
+          highestObservedDatasetWinRate: null,
+          highestObservedCreativeWinRate: null,
+        },
+      });
+      const parsed = aiFeedbackExplanationOutputSchema.parse(raw);
+      expect(parsed.summary.length).toBeGreaterThan(0);
+    });
+
+    it("makes no network call", async () => {
+      const provider = new StubAiProvider();
+      await expect(
+        provider.explainFeedback({ topCampaigns: [], topDatasets: [], topCreatives: [], signals: {} }),
+      ).resolves.toBeTruthy();
+    });
+  });
+});
+
+describe("aiFeedbackExplanationOutputSchema", () => {
+  it("rejects summary text containing forbidden causal/guarantee language", () => {
+    expect(
+      aiFeedbackExplanationOutputSchema.safeParse({
+        summary: "Campaign A caused the increase in sales.",
+        highlights: [],
+      }).success,
+    ).toBe(false);
+    expect(
+      aiFeedbackExplanationOutputSchema.safeParse({
+        summary: "This dataset is guaranteed to convert.",
+        highlights: [],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects unknown fields (strict)", () => {
+    expect(
+      aiFeedbackExplanationOutputSchema.safeParse({
+        summary: "ok",
+        highlights: [],
+        confidenceScore: 0.9,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("accepts safe, factual advisory wording", () => {
+    expect(
+      aiFeedbackExplanationOutputSchema.safeParse({
+        summary: "Campaign A has the highest observed win rate (0.7) among campaigns with recorded sales.",
+        highlights: ["Recorded sales value: campaign A leads at 500.00."],
+      }).success,
+    ).toBe(true);
   });
 });

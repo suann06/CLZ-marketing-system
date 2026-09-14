@@ -125,6 +125,7 @@ model Dataset {
   buildings         Building[]
   campaignDatasets  CampaignDataset[]
   campaignBuildings CampaignBuilding[]
+  acquisitionEvents AcquisitionEvent[]
 
   @@map("datasets")
 }
@@ -298,6 +299,7 @@ model Launch {
 
   campaign   Campaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   contentSet ContentSet @relation(fields: [contentSetId], references: [id], onDelete: Restrict)
+  acquisitionEvents AcquisitionEvent[]
 
   @@index([campaignId])
   @@index([contentSetId])
@@ -316,9 +318,22 @@ model Launch {
 // other model in this schema names its Campaign relation `campaign`, but
 // that name is already taken here by the UTM `campaign` attribution field
 // below, so the relation is renamed on this one model to avoid the clash.
+//
+// Stage 10 (Phase 4 final): datasetId/launchId are the smallest additive
+// relationship needed to trace a click back to a specific Dataset and/or
+// creative (Launch = contentSetId+contentSetVersion+platform+variantIndex,
+// already a stable identity — see Launch's own doc comment; no separate
+// "Creative" table was introduced). Both nullable: a click's tracking URL
+// may not always carry this detail (e.g. a campaign spanning multiple
+// datasets via one shared link), and neither field is ever inferred or
+// guessed — see acquisition-service.ts, which validates that a supplied
+// datasetId/launchId genuinely belongs to the same campaign before
+// persisting it.
 model AcquisitionEvent {
-  id         String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  campaignId String @map("campaign_id") @db.Uuid
+  id         String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  campaignId String  @map("campaign_id") @db.Uuid
+  datasetId  String? @map("dataset_id") @db.Uuid
+  launchId   String? @map("launch_id") @db.Uuid
 
   source   String? // e.g. utm_source
   medium   String? // e.g. utm_medium
@@ -328,10 +343,14 @@ model AcquisitionEvent {
   createdAt DateTime @default(now()) @map("created_at")
 
   campaignRecord Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  dataset        Dataset? @relation(fields: [datasetId], references: [id], onDelete: SetNull)
+  launch         Launch?  @relation(fields: [launchId], references: [id], onDelete: SetNull)
   leads          Lead[]
 
   @@index([campaignId])
   @@index([createdAt])
+  @@index([datasetId])
+  @@index([launchId])
   @@map("acquisition_events")
 }
 

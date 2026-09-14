@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { acquisitionClickSchema } from "@/server/validation/acquisition-schema";
-import { recordAcquisitionEvent } from "@/server/services/acquisition-service";
+import {
+  recordAcquisitionEvent,
+  InvalidAcquisitionAttributionError,
+} from "@/server/services/acquisition-service";
 import { CampaignNotFoundError } from "@/server/services/campaign-service";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +24,9 @@ export async function POST(request: Request) {
   } catch (err) {
     if (err instanceof CampaignNotFoundError) {
       return NextResponse.json({ error: err.message }, { status: 404 });
+    }
+    if (err instanceof InvalidAcquisitionAttributionError) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
     }
     throw err;
   }

@@ -2,8 +2,21 @@ import type {
   AiProviderAdapter,
   AiConversationRequest,
   AiClassificationRequest,
+  AiFeedbackExplanationRequest,
   AiCustomerInfo,
 } from "@/server/providers/ai/provider-adapter";
+
+type ComparisonHighlightLike = { id: string; value: number | string };
+
+function isHighlight(v: unknown): v is ComparisonHighlightLike {
+  return (
+    !!v &&
+    typeof v === "object" &&
+    "id" in v &&
+    "value" in v &&
+    typeof (v as { id: unknown }).id === "string"
+  );
+}
 
 // Deliberately simple, deterministic keyword matching — a real provider
 // would use an LLM; this stub only needs to produce a valid, testable
@@ -136,6 +149,57 @@ export class StubAiProvider implements AiProviderAdapter {
     return {
       classification: "warm",
       reason: "Customer engaged with a non-trivial message but did not state a clear decision to proceed or decline.",
+    };
+  }
+
+  // Stage 11: phrases already-computed signals (id + numeric/string value
+  // pairs from feedback-service.ts's getFeedbackSummary()) using only
+  // "highest observed"/"recorded" wording — never computes a rate/sum/
+  // count itself (everything here is read from `request.signals`, never
+  // derived from raw data), never claims causation, makes no network
+  // call. Any signal absent (null — no eligible sample yet) is simply
+  // skipped rather than guessed at.
+  async explainFeedback(request: AiFeedbackExplanationRequest): Promise<unknown> {
+    const signals = (request.signals ?? {}) as Record<string, unknown>;
+    const lines: string[] = [];
+
+    const campaignWinRate = signals.highestObservedCampaignWinRate;
+    if (isHighlight(campaignWinRate)) {
+      lines.push(
+        `Recorded conversion rate: campaign ${campaignWinRate.id} has the highest observed win rate (${campaignWinRate.value}) among campaigns with recorded sales.`,
+      );
+    }
+
+    const campaignSalesValue = signals.highestObservedCampaignSalesValue;
+    if (isHighlight(campaignSalesValue)) {
+      lines.push(
+        `Recorded sales value: campaign ${campaignSalesValue.id} has the highest observed total sales value (${campaignSalesValue.value}).`,
+      );
+    }
+
+    const datasetWinRate = signals.highestObservedDatasetWinRate;
+    if (isHighlight(datasetWinRate)) {
+      lines.push(
+        `Dataset ${datasetWinRate.id} has the highest observed win rate (${datasetWinRate.value}) among datasets with recorded sales.`,
+      );
+    }
+
+    const creativeWinRate = signals.highestObservedCreativeWinRate;
+    if (isHighlight(creativeWinRate)) {
+      lines.push(
+        `Creative ${creativeWinRate.id} has the highest observed win rate (${creativeWinRate.value}) among creatives with recorded sales.`,
+      );
+    }
+
+    if (lines.length === 0) {
+      lines.push(
+        "No campaigns, datasets, or creatives currently have enough recorded sales data for a comparative observation — an area worth reviewing as more outcomes are recorded.",
+      );
+    }
+
+    return {
+      summary: lines.join(" "),
+      highlights: lines,
     };
   }
 }

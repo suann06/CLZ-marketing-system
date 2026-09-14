@@ -59,6 +59,22 @@ export type AiClassificationRequest = {
   recentMessages: AiConversationMessage[];
 };
 
+// Stage 11 (Phase 4 final): the AI is given ONLY already-computed,
+// deterministic numbers/ids — see feedback-service.ts's
+// getFeedbackSummaryWithExplanation(), which always calculates
+// topCampaigns/topDatasets/topCreatives/signals itself first, independent
+// of this call. The AI never receives raw Lead/Sale/AcquisitionEvent rows
+// and is never asked to compute a rate, sum, or count — only to phrase an
+// advisory summary of numbers that already exist. See
+// ai-feedback-explanation-schema.ts for the structural + wording
+// safeguards on what it's allowed to return.
+export type AiFeedbackExplanationRequest = {
+  topCampaigns: unknown;
+  topDatasets: unknown;
+  topCreatives: unknown;
+  signals: unknown;
+};
+
 export interface AiProviderAdapter {
   readonly providerName: string;
   converse(request: AiConversationRequest): Promise<unknown>;
@@ -69,4 +85,10 @@ export interface AiProviderAdapter {
   // proposal; lead-classification-service.ts alone decides whether/how to
   // apply it to Lead.status.
   classifyLead(request: AiClassificationRequest): Promise<unknown>;
+  // Returns Promise<unknown> — feedback-service.ts always validates the
+  // result against ai-feedback-explanation-schema.ts, and treats any
+  // failure (provider throws, or output fails validation) as "no
+  // explanation available", never as a fatal error — the deterministic
+  // Stage 11 output is always returned regardless of this call's outcome.
+  explainFeedback(request: AiFeedbackExplanationRequest): Promise<unknown>;
 }
