@@ -133,6 +133,7 @@ model Campaign {
   marketingStrategies MarketingStrategy[]
   contentSets ContentSet[]
   launches Launch[]
+  acquisitionEvents AcquisitionEvent[]
 
   @@map("campaigns")
 }
@@ -258,6 +259,35 @@ model Launch {
   @@index([contentSetId])
   @@index([idempotencyKey])
   @@map("launches")
+}
+
+// Phase 3A: records where an incoming customer click originated from
+// (source/medium/campaign/ref — standard UTM-style attribution), kept
+// exactly as received. campaignId is the sole authoritative campaign
+// attribution — these string fields are never merged, inferred from, or
+// used to override it. Purely an attribution log; never creates or
+// modifies a Campaign, Lead, or WhatsApp record.
+//
+// The relation field is named `campaignRecord`, not `campaign` — every
+// other model in this schema names its Campaign relation `campaign`, but
+// that name is already taken here by the UTM `campaign` attribution field
+// below, so the relation is renamed on this one model to avoid the clash.
+model AcquisitionEvent {
+  id         String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  campaignId String @map("campaign_id") @db.Uuid
+
+  source   String? // e.g. utm_source
+  medium   String? // e.g. utm_medium
+  campaign String? // e.g. utm_campaign — distinct from the Campaign relation below
+  ref      String? // free-form reference / click id
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  campaignRecord Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([createdAt])
+  @@map("acquisition_events")
 }
 
 // Which dataset(s) a campaign targets. Datasets are selected independently —
