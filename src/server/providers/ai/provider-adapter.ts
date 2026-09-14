@@ -47,7 +47,26 @@ export type AiConversationRequest = {
   currentMessage: string;
 };
 
+// Phase 3D: same controlled-context shape as AiConversationRequest, minus
+// currentMessage — classification looks at the conversation as a whole,
+// not a single latest message. Deliberately has no "sufficient signal"
+// flag: lead-classification-service.ts decides whether to call
+// classifyLead() at all (see its hasSufficientSignal()) — the provider is
+// never asked to abstain, only to classify what it's given.
+export type AiClassificationRequest = {
+  campaign: AiCampaignContext;
+  customerInfo: AiCustomerInfo;
+  recentMessages: AiConversationMessage[];
+};
+
 export interface AiProviderAdapter {
   readonly providerName: string;
   converse(request: AiConversationRequest): Promise<unknown>;
+  // Returns Promise<unknown> for the same reason converse() does — the
+  // caller (lead-classification-service.ts) always validates the result
+  // against lead-classification-schema.ts before trusting it. Must never
+  // return "new" or any value outside hot/warm/cold — classification is a
+  // proposal; lead-classification-service.ts alone decides whether/how to
+  // apply it to Lead.status.
+  classifyLead(request: AiClassificationRequest): Promise<unknown>;
 }

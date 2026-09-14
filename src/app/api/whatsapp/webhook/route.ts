@@ -3,6 +3,7 @@ import { whatsAppWebhookSchema } from "@/server/validation/whatsapp-webhook-sche
 import { findOrCreateLead } from "@/server/services/lead-service";
 import { storeInboundMessage } from "@/server/services/whatsapp-service";
 import { processInboundMessage, ConversationAiError } from "@/server/services/conversation-service";
+import { classifyLead } from "@/server/services/lead-classification-service";
 import { CampaignNotFoundError } from "@/server/services/campaign-service";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +24,15 @@ export const dynamic = "force-dynamic";
 // isNewMessage: false means this delivery is a retry of an
 // already-processed message (see whatsapp-service.ts), and must not
 // trigger a second AI response.
+//
+// Phase 3D adds one further step after conversation processing succeeds:
+// hand off to lead-classification-service.ts, which decides on its own
+// (see hasSufficientSignal()) whether there's enough signal to propose a
+// hot/warm/cold classification, and owns the actual Lead.status mutation.
+// A classification failure never fails the whole webhook response — by
+// this point the inbound message and the AI's conversational reply have
+// already fully succeeded, so classification is treated as a best-effort
+// refinement, not a hard requirement of receiving the message.
 //
 // The route stays thin: no Prisma calls here, no AI/WhatsApp-provider
 // calls here — everything beyond validation is delegated to the service
@@ -57,7 +67,15 @@ export async function POST(request: Request) {
 
     try {
       const conversation = await processInboundMessage({ leadId: lead.id, threadId: thread.id });
-      return NextResponse.json({ lead, thread, message, conversation }, { status: 201 });
+
+      let classification: Awaited<ReturnType<typeof classifyLead>> | { error: string } | null = null;
+      try {
+        classification = await classifyLead({ leadId: lead.id, threadId: thread.id });
+      } catch (err) {
+        classification = { error: err instanceof Error ? err.message : "Unknown classification error." };
+      }
+
+      return NextResponse.json({ lead, thread, message, conversation, classification }, { status: 201 });
     } catch (err) {
       if (err instanceof ConversationAiError) {
         // The inbound message above is already committed regardless of
@@ -65,7 +83,7 @@ export async function POST(request: Request) {
         // (upstream AI processing failed), distinct from the 400/404
         // validation/attribution failures below.
         return NextResponse.json(
-          { lead, thread, message, conversation: null, error: err.message },
+          { lead, thread, message, conversation: null, classification: null, error: err.message },
           { status: 502 },
         );
       }
