@@ -82,6 +82,17 @@ enum WhatsAppMessageDirection {
   outbound
 }
 
+// No in-flight state (e.g. "sending") by design — see FollowUp.claimedAt
+// for how follow-up-service.ts achieves concurrency-safe processing
+// without one. A row only ever becomes "sent" after the WhatsApp provider
+// call actually succeeds.
+enum FollowUpStatus {
+  pending
+  sent
+  failed
+  cancelled
+}
+
 // Independent from ContentSetStatus — this describes publishing state, not
 // content review state. "approved" (ContentSet) is not the same concept as
 // "live" (Launch).
@@ -342,6 +353,7 @@ model Lead {
   statusHistory    LeadStatusHistory[]
   threads          WhatsAppThread[]
   messages         WhatsAppMessage[]
+  followUps        FollowUp[]
 
   @@index([campaignId])
   @@index([phone])
@@ -415,6 +427,43 @@ model WhatsAppMessage {
   @@index([leadId, createdAt])
   @@index([externalMessageId])
   @@map("whatsapp_messages")
+}
+
+// Phase 3E: Day 1/3/7 follow-up messages for a Lead on the warm/cold
+// journey. `day` is a plain Int (1|3|7); the allowed set is enforced in
+// follow-up-service.ts, not the database — matching this project's
+// existing convention of enforcing invariants at the application/service
+// level (e.g. Launch's idempotencyKey) rather than in the schema.
+//
+// `claimedAt` exists solely for concurrency-safe processing WITHOUT an
+// in-flight status value: processDueFollowUps() atomically claims a row
+// via `UPDATE ... WHERE status = 'pending' AND claimed_at IS NULL`
+// (Postgres guarantees only one concurrent caller can win that per-row
+// update), then only that caller attempts the WhatsApp send and decides
+// the real outcome (sent/failed). `status` therefore only ever reflects a
+// row's actual, final outcome — it is never set to "sent" before the
+// provider call has actually succeeded. If the process crashes between
+// claiming and recording an outcome, the row is left claimed-but-pending
+// forever; recovering such rows is out of scope for Phase 3E, the same
+// crash-window caveat already accepted in launch-service.ts.
+model FollowUp {
+  id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  leadId        String         @map("lead_id") @db.Uuid
+  day           Int
+  scheduledAt   DateTime       @map("scheduled_at")
+  status        FollowUpStatus @default(pending)
+  claimedAt     DateTime?      @map("claimed_at")
+  sentAt        DateTime?      @map("sent_at")
+  failureReason String?        @map("failure_reason")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([scheduledAt])
+  @@index([leadId, day])
+  @@map("follow_ups")
 }
 
 // Which dataset(s) a campaign targets. Datasets are selected independently —

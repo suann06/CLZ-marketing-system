@@ -4,6 +4,7 @@ import { findOrCreateLead } from "@/server/services/lead-service";
 import { storeInboundMessage } from "@/server/services/whatsapp-service";
 import { processInboundMessage, ConversationAiError } from "@/server/services/conversation-service";
 import { classifyLead } from "@/server/services/lead-classification-service";
+import { scheduleFollowUpJourney, cancelPendingFollowUps } from "@/server/services/follow-up-service";
 import { CampaignNotFoundError } from "@/server/services/campaign-service";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +34,16 @@ export const dynamic = "force-dynamic";
 // this point the inbound message and the AI's conversational reply have
 // already fully succeeded, so classification is treated as a best-effort
 // refinement, not a hard requirement of receiving the message.
+//
+// Phase 3E adds one more step, only when classification actually changed
+// the Lead's status: hand off to follow-up-service.ts, which owns
+// Day 1/3/7 follow-up scheduling and cancellation. Deliberately NOT added
+// inside lead-classification-service.ts itself (kept frozen, zero diff) —
+// the webhook route is the established cross-phase integration seam, same
+// as how 3C/3D were wired in above. A hot Lead has its pending follow-ups
+// cancelled; a warm/cold Lead has its follow-up journey scheduled
+// (idempotently — a no-op if one is already active). Like classification,
+// this is best-effort and never fails the webhook response.
 //
 // The route stays thin: no Prisma calls here, no AI/WhatsApp-provider
 // calls here — everything beyond validation is delegated to the service
@@ -75,7 +86,20 @@ export async function POST(request: Request) {
         classification = { error: err instanceof Error ? err.message : "Unknown classification error." };
       }
 
-      return NextResponse.json({ lead, thread, message, conversation, classification }, { status: 201 });
+      let followUp: unknown = null;
+      if (classification && "changed" in classification && classification.changed) {
+        try {
+          if (classification.status === "hot") {
+            followUp = await cancelPendingFollowUps(lead.id, "Lead became hot.");
+          } else if (classification.status === "warm" || classification.status === "cold") {
+            followUp = await scheduleFollowUpJourney(lead.id);
+          }
+        } catch (err) {
+          followUp = { error: err instanceof Error ? err.message : "Unknown follow-up error." };
+        }
+      }
+
+      return NextResponse.json({ lead, thread, message, conversation, classification, followUp }, { status: 201 });
     } catch (err) {
       if (err instanceof ConversationAiError) {
         // The inbound message above is already committed regardless of
