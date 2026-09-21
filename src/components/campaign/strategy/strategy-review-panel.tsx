@@ -8,6 +8,13 @@ import {
   type MarketingStrategyOutput,
 } from "@/server/ai/schemas/marketing-strategy-output";
 import { GenerateContentButton } from "@/components/campaign/content/generate-content-button";
+import { PageContainer } from "@/components/layout/page-container";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select } from "@/components/ui/select";
 
 type Platform = "facebook" | "instagram" | "tiktok" | "whatsapp";
 const PLATFORMS: Platform[] = ["facebook", "instagram", "tiktok", "whatsapp"];
@@ -26,41 +33,31 @@ function ListEditor({
       <p className="text-sm font-medium">{label}</p>
       {items.map((value, index) => (
         <div key={index} className="flex gap-2">
-          <input
+          <Input
             value={value}
             onChange={(e) => {
               const next = [...items];
               next[index] = e.target.value;
               onChange(next);
             }}
-            className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
+            className="flex-1"
           />
-          <button
+          <Button
             type="button"
+            variant="secondary"
             onClick={() => onChange(items.filter((_, i) => i !== index))}
             aria-label={`Remove ${label} item`}
-            className="rounded border border-gray-300 px-3 py-2 text-sm text-gray-500 hover:bg-gray-50"
           >
             ×
-          </button>
+          </Button>
         </div>
       ))}
-      <button
-        type="button"
-        onClick={() => onChange([...items, ""])}
-        className="self-start rounded border border-gray-300 px-3 py-1 text-xs font-medium hover:bg-gray-50"
-      >
+      <Button type="button" variant="secondary" size="sm" className="self-start" onClick={() => onChange([...items, ""])}>
         + Add
-      </button>
+      </Button>
     </div>
   );
 }
-
-const STATUS_STYLES: Record<string, string> = {
-  draft: "bg-gray-100 text-gray-700",
-  approved: "bg-green-100 text-green-700",
-  archived: "bg-gray-100 text-gray-400",
-};
 
 export function StrategyReviewPanel({
   campaignId,
@@ -180,121 +177,93 @@ export function StrategyReviewPanel({
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10">
-      <h1 className="mb-1 text-xl font-semibold">Marketing Strategy</h1>
-      <p className="mb-6 text-sm text-gray-500">
-        Version {version} ·{" "}
-        <span
-          className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_STYLES[status] ?? ""}`}
-        >
-          {status}
-        </span>
-      </p>
+    <PageContainer maxWidth="max-w-3xl">
+      <div className="mb-6 flex items-center gap-3">
+        <h2 className="text-lg font-semibold">Strategy</h2>
+        <span className="text-sm text-muted">Version {version}</span>
+        <Badge status={status}>{status}</Badge>
+      </div>
 
       {mode === "view" ? (
         <>
           <div className="flex flex-col gap-6">
-            <section className="rounded border border-gray-200 p-4">
-              <p className="mb-2 text-sm font-medium">Target Audience</p>
+            <Card title="Target Audience">
               <p className="mb-2 text-sm">{content.targetAudience.description}</p>
-              <ul className="list-inside list-disc text-sm text-gray-600">
+              <ul className="list-inside list-disc text-sm text-muted">
                 {content.targetAudience.segments.map((s, i) => (
                   <li key={i}>{s}</li>
                 ))}
               </ul>
-            </section>
+            </Card>
 
-            <section className="rounded border border-gray-200 p-4">
-              <p className="mb-2 text-sm font-medium">Customer Needs</p>
-              <ul className="list-inside list-disc text-sm text-gray-600">
+            <Card title="Customer Needs">
+              <ul className="list-inside list-disc text-sm text-muted">
                 {content.customerNeeds.map((n, i) => (
                   <li key={i}>{n}</li>
                 ))}
               </ul>
-            </section>
+            </Card>
 
-            <section className="rounded border border-gray-200 p-4">
-              <p className="mb-2 text-sm font-medium">Positioning</p>
-              <p className="text-sm text-gray-600">{content.positioning}</p>
-            </section>
+            <Card title="Positioning">
+              <p className="text-sm text-muted">{content.positioning}</p>
+            </Card>
 
-            <section className="rounded border border-gray-200 p-4">
-              <p className="mb-2 text-sm font-medium">Marketing Angles</p>
-              <ul className="list-inside list-disc text-sm text-gray-600">
+            <Card title="Marketing Angles">
+              <ul className="list-inside list-disc text-sm text-muted">
                 {content.marketingAngles.map((a, i) => (
                   <li key={i}>{a}</li>
                 ))}
               </ul>
-            </section>
+            </Card>
 
-            <section className="rounded border border-gray-200 p-4">
-              <p className="mb-2 text-sm font-medium">Messaging Pillars</p>
+            <Card title="Messaging Pillars">
               <div className="flex flex-col gap-3">
                 {content.messagingPillars.map((p, i) => (
                   <div key={i}>
-                    <p className="text-sm font-medium text-gray-700">{p.title}</p>
-                    <p className="text-sm text-gray-600">{p.description}</p>
+                    <p className="text-sm font-medium text-foreground">{p.title}</p>
+                    <p className="text-sm text-muted">{p.description}</p>
                   </div>
                 ))}
               </div>
-            </section>
+            </Card>
 
-            <section className="rounded border border-gray-200 p-4">
-              <p className="mb-2 text-sm font-medium">Platform Direction</p>
+            <Card title="Platform Direction">
               <div className="flex flex-col gap-3">
                 {content.platformDirection.map((p, i) => (
                   <div key={i}>
-                    <p className="text-sm font-medium capitalize text-gray-700">{p.platform}</p>
-                    <p className="text-sm text-gray-600">{p.direction}</p>
+                    <p className="text-sm font-medium capitalize text-foreground">{p.platform}</p>
+                    <p className="text-sm text-muted">{p.direction}</p>
                   </div>
                 ))}
               </div>
-            </section>
+            </Card>
 
-            <section className="rounded border border-gray-200 p-4">
-              <p className="mb-2 text-sm font-medium">CTA</p>
-              <p className="text-sm text-gray-600">{content.cta}</p>
-            </section>
+            <Card title="CTA">
+              <p className="text-sm text-muted">{content.cta}</p>
+            </Card>
           </div>
 
-          {formError && <p className="mt-4 text-sm text-red-600">{formError}</p>}
+          {formError && <p className="mt-4 text-sm text-error">{formError}</p>}
 
           <div className="mt-6 flex items-center gap-3">
             {status === "draft" && (
               <>
-                <button
-                  type="button"
-                  onClick={startEdit}
-                  className="rounded border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
-                >
+                <Button type="button" variant="secondary" onClick={startEdit}>
                   Edit
-                </button>
+                </Button>
                 {!confirmingApprove ? (
-                  <button
-                    type="button"
-                    onClick={() => setConfirmingApprove(true)}
-                    className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white"
-                  >
+                  <Button type="button" onClick={() => setConfirmingApprove(true)}>
                     Approve
-                  </button>
+                  </Button>
                 ) : (
                   <div className="flex items-center gap-2 text-sm">
                     <span>Confirm approval?</span>
-                    <button
-                      type="button"
-                      onClick={handleApprove}
-                      disabled={submitting}
-                      className="rounded bg-gray-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-                    >
+                    <Button type="button" size="sm" onClick={handleApprove} isLoading={submitting}>
                       {submitting ? "Approving…" : "Yes, approve"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmingApprove(false)}
-                      className="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50"
-                    >
+                    </Button>
+                    <Button type="button" variant="secondary" size="sm" onClick={() => setConfirmingApprove(false)}>
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 )}
               </>
@@ -302,10 +271,7 @@ export function StrategyReviewPanel({
             {status === "approved" && (
               <div className="flex items-center gap-3">
                 {existingContent && (
-                  <Link
-                    href={`/campaigns/${campaignId}/content`}
-                    className="text-sm text-gray-600 underline"
-                  >
+                  <Link href={`/campaigns/${campaignId}/content`} className="text-sm text-muted underline">
                     View current content (v{existingContent.version}, {existingContent.status})
                   </Link>
                 )}
@@ -316,15 +282,14 @@ export function StrategyReviewPanel({
         </>
       ) : (
         <div className="flex flex-col gap-6">
-          <section className="rounded border border-gray-200 p-4">
-            <p className="mb-2 text-sm font-medium">Target Audience Description</p>
-            <textarea
+          <Card title="Target Audience Description">
+            <Textarea
               value={draft.targetAudience.description}
               onChange={(e) =>
                 setDraft({ ...draft, targetAudience: { ...draft.targetAudience, description: e.target.value } })
               }
               rows={2}
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
+              className="w-full"
             />
             <div className="mt-3">
               <ListEditor
@@ -335,41 +300,39 @@ export function StrategyReviewPanel({
                 }
               />
             </div>
-          </section>
+          </Card>
 
-          <section className="rounded border border-gray-200 p-4">
+          <Card>
             <ListEditor
               label="Customer Needs"
               items={draft.customerNeeds}
               onChange={(customerNeeds) => setDraft({ ...draft, customerNeeds })}
             />
-          </section>
+          </Card>
 
-          <section className="rounded border border-gray-200 p-4">
-            <p className="mb-2 text-sm font-medium">Positioning</p>
-            <textarea
+          <Card title="Positioning">
+            <Textarea
               value={draft.positioning}
               onChange={(e) => setDraft({ ...draft, positioning: e.target.value })}
               rows={3}
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
+              className="w-full"
             />
-          </section>
+          </Card>
 
-          <section className="rounded border border-gray-200 p-4">
+          <Card>
             <ListEditor
               label="Marketing Angles"
               items={draft.marketingAngles}
               onChange={(marketingAngles) => setDraft({ ...draft, marketingAngles })}
             />
-          </section>
+          </Card>
 
-          <section className="rounded border border-gray-200 p-4">
-            <p className="mb-2 text-sm font-medium">Messaging Pillars</p>
+          <Card title="Messaging Pillars">
             <div className="flex flex-col gap-3">
               {draft.messagingPillars.map((pillar, index) => (
-                <div key={index} className="flex flex-col gap-2 rounded border border-gray-100 p-3">
+                <div key={index} className="flex flex-col gap-2 rounded border border-border p-3">
                   <div className="flex gap-2">
-                    <input
+                    <Input
                       value={pillar.title}
                       onChange={(e) => {
                         const next = [...draft.messagingPillars];
@@ -377,22 +340,22 @@ export function StrategyReviewPanel({
                         setDraft({ ...draft, messagingPillars: next });
                       }}
                       placeholder="Title"
-                      className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
+                      className="flex-1"
                     />
-                    <button
+                    <Button
                       type="button"
+                      variant="secondary"
                       onClick={() =>
                         setDraft({
                           ...draft,
                           messagingPillars: draft.messagingPillars.filter((_, i) => i !== index),
                         })
                       }
-                      className="rounded border border-gray-300 px-3 py-2 text-sm text-gray-500 hover:bg-gray-50"
                     >
                       ×
-                    </button>
+                    </Button>
                   </div>
-                  <textarea
+                  <Textarea
                     value={pillar.description}
                     onChange={(e) => {
                       const next = [...draft.messagingPillars];
@@ -401,60 +364,60 @@ export function StrategyReviewPanel({
                     }}
                     placeholder="Description"
                     rows={2}
-                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
+                    className="w-full"
                   />
                 </div>
               ))}
             </div>
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              size="sm"
+              className="mt-2 self-start"
               onClick={() =>
                 setDraft({
                   ...draft,
                   messagingPillars: [...draft.messagingPillars, { title: "", description: "" }],
                 })
               }
-              className="mt-2 self-start rounded border border-gray-300 px-3 py-1 text-xs font-medium hover:bg-gray-50"
             >
               + Add pillar
-            </button>
-          </section>
+            </Button>
+          </Card>
 
-          <section className="rounded border border-gray-200 p-4">
-            <p className="mb-2 text-sm font-medium">Platform Direction</p>
+          <Card title="Platform Direction">
             <div className="flex flex-col gap-3">
               {draft.platformDirection.map((entry, index) => (
-                <div key={index} className="flex flex-col gap-2 rounded border border-gray-100 p-3">
+                <div key={index} className="flex flex-col gap-2 rounded border border-border p-3">
                   <div className="flex gap-2">
-                    <select
+                    <Select
                       value={entry.platform}
                       onChange={(e) => {
                         const next = [...draft.platformDirection];
                         next[index] = { ...next[index], platform: e.target.value as Platform };
                         setDraft({ ...draft, platformDirection: next });
                       }}
-                      className="rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
                     >
                       {PLATFORMS.map((p) => (
                         <option key={p} value={p}>
                           {p}
                         </option>
                       ))}
-                    </select>
-                    <button
+                    </Select>
+                    <Button
                       type="button"
+                      variant="secondary"
                       onClick={() =>
                         setDraft({
                           ...draft,
                           platformDirection: draft.platformDirection.filter((_, i) => i !== index),
                         })
                       }
-                      className="rounded border border-gray-300 px-3 py-2 text-sm text-gray-500 hover:bg-gray-50"
                     >
                       ×
-                    </button>
+                    </Button>
                   </div>
-                  <textarea
+                  <Textarea
                     value={entry.direction}
                     onChange={(e) => {
                       const next = [...draft.platformDirection];
@@ -463,56 +426,43 @@ export function StrategyReviewPanel({
                     }}
                     placeholder="Direction"
                     rows={2}
-                    className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
+                    className="w-full"
                   />
                 </div>
               ))}
             </div>
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              size="sm"
+              className="mt-2 self-start"
               onClick={() =>
                 setDraft({
                   ...draft,
                   platformDirection: [...draft.platformDirection, { platform: "facebook", direction: "" }],
                 })
               }
-              className="mt-2 self-start rounded border border-gray-300 px-3 py-1 text-xs font-medium hover:bg-gray-50"
             >
               + Add platform direction
-            </button>
-          </section>
+            </Button>
+          </Card>
 
-          <section className="rounded border border-gray-200 p-4">
-            <p className="mb-2 text-sm font-medium">CTA</p>
-            <input
-              value={draft.cta}
-              onChange={(e) => setDraft({ ...draft, cta: e.target.value })}
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
-            />
-          </section>
+          <Card title="CTA">
+            <Input value={draft.cta} onChange={(e) => setDraft({ ...draft, cta: e.target.value })} className="w-full" />
+          </Card>
 
-          {formError && <p className="text-sm text-red-600">{formError}</p>}
+          {formError && <p className="text-sm text-error">{formError}</p>}
 
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={submitting}
-              className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-            >
+            <Button type="button" onClick={handleSave} isLoading={submitting}>
               {submitting ? "Saving…" : "Save Changes"}
-            </button>
-            <button
-              type="button"
-              onClick={cancelEdit}
-              disabled={submitting}
-              className="rounded border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
-            >
+            </Button>
+            <Button type="button" variant="secondary" onClick={cancelEdit} disabled={submitting}>
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }

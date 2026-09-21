@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
 
 export function GenerateContentButton({ campaignId }: { campaignId: string }) {
   const router = useRouter();
@@ -40,15 +41,10 @@ export function GenerateContentButton({ campaignId }: { campaignId: string }) {
 
   return (
     <div>
-      <button
-        type="button"
-        onClick={handleClick}
-        disabled={submitting}
-        className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-      >
+      <Button type="button" onClick={handleClick} isLoading={submitting}>
         {submitting ? "Generating…" : "Generate Content"}
-      </button>
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      </Button>
+      {error && <p className="mt-2 text-sm text-error">{error}</p>}
     </div>
   );
 }

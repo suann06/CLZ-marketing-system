@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
-import { requireHumanActor, UnauthenticatedError } from "@/lib/actor";
 import {
   getCampaignBrief,
   CampaignNotFoundError,
@@ -11,23 +10,21 @@ import {
   MarketingStrategyNotFoundError,
 } from "@/server/services/marketing-strategy-service";
 import { GenerateStrategyButton } from "@/components/campaign/strategy/generate-strategy-button";
+import { PageContainer } from "@/components/layout/page-container";
+import { Card } from "@/components/ui/card";
 
 export const dynamic = "force-dynamic";
 
-export default async function CampaignBriefPage({
+// Redesigned from "Campaign Brief" into "Overview" for the Campaign
+// Workspace (Phase 4B) — same getCampaignBrief() data and the same
+// GenerateStrategyButton behavior, only the presentation changed. Campaign
+// name/status now live in the persistent workspace header, so this page no
+// longer repeats them.
+export default async function CampaignOverviewPage({
   params,
 }: {
   params: Promise<{ campaignId: string }>;
 }) {
-  try {
-    await requireHumanActor();
-  } catch (err) {
-    if (err instanceof UnauthenticatedError) {
-      redirect("/login");
-    }
-    throw err;
-  }
-
   const { campaignId } = await params;
 
   let brief;
@@ -64,28 +61,25 @@ export default async function CampaignBriefPage({
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10">
-      <h1 className="mb-1 text-xl font-semibold">Campaign Brief</h1>
-      <p className="mb-6 text-sm text-gray-500 capitalize">Status: {brief.status}</p>
+    <PageContainer maxWidth="max-w-3xl">
+      <h2 className="mb-6 text-lg font-semibold">Overview</h2>
 
       <div className="flex flex-col gap-6">
-        <section className="rounded border border-gray-200 p-4">
-          <p className="mb-2 text-sm font-medium">Product / Pricing / Promotion</p>
+        <Card title="Product / Pricing / Promotion">
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-            <dt className="text-gray-500">Product / Promotion</dt>
+            <dt className="text-muted">Product / Promotion</dt>
             <dd>{brief.productPromotion}</dd>
-            <dt className="text-gray-500">Official Pricing</dt>
+            <dt className="text-muted">Official Pricing</dt>
             <dd>
               {officialPricing.amount ?? "—"} {officialPricing.currency ?? ""}
               {officialPricing.terms ? ` · ${officialPricing.terms}` : ""}
             </dd>
           </dl>
-        </section>
+        </Card>
 
-        <section className="rounded border border-gray-200 p-4">
-          <p className="mb-2 text-sm font-medium">Differentiators</p>
+        <Card title="Differentiators">
           {differentiators.length === 0 ? (
-            <p className="text-sm text-gray-500">None.</p>
+            <p className="text-sm text-muted">None.</p>
           ) : (
             <ul className="list-inside list-disc text-sm">
               {differentiators.map((d, i) => (
@@ -93,48 +87,43 @@ export default async function CampaignBriefPage({
               ))}
             </ul>
           )}
-        </section>
+        </Card>
 
-        <section className="rounded border border-gray-200 p-4">
-          <p className="mb-2 text-sm font-medium">
-            Selected Dataset(s) ({brief.datasets.length})
-          </p>
-          <ul className="divide-y divide-gray-200">
+        <Card title={`Selected Dataset(s) (${brief.datasets.length})`}>
+          <ul className="divide-y divide-border">
             {brief.datasets.map((d) => (
               <li key={d.datasetId} className="py-2 text-sm">
                 <span className="font-medium">{d.name}</span>
-                <span className="ml-2 text-gray-500">
+                <span className="ml-2 text-muted">
                   {d.sourceFilename} · {d.rowCount} total rows · {d.selectedBuildingCount} selected
                 </span>
               </li>
             ))}
           </ul>
-        </section>
+        </Card>
 
-        <section className="rounded border border-gray-200 p-4">
-          <p className="mb-3 text-sm font-medium">
-            Targeting Summary — {brief.targetingAnalysis.totalSelectedBuildings} building(s)
-            selected across {brief.targetingAnalysis.datasetCount} dataset(s)
-          </p>
+        <Card
+          title={`Targeting Summary — ${brief.targetingAnalysis.totalSelectedBuildings} building(s) selected across ${brief.targetingAnalysis.datasetCount} dataset(s)`}
+        >
           <div className="flex flex-col gap-4">
             {brief.targetingAnalysis.byDataset.map((d) => (
-              <div key={d.datasetId} className="rounded border border-gray-100 p-3">
-                <p className="mb-1 text-sm font-medium text-gray-700">
+              <div key={d.datasetId} className="rounded border border-border p-3">
+                <p className="mb-1 text-sm font-medium text-foreground">
                   {d.datasetName} — {d.buildingCount} building(s)
                 </p>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-muted">
                   {d.buildingsWithAddress} with an address · {d.buildingsWithCoordinates} with
                   coordinates
                 </p>
                 {d.availableAttributeKeys.length > 0 && (
-                  <p className="mt-1 text-sm text-gray-500">
+                  <p className="mt-1 text-sm text-muted">
                     Available attributes: {d.availableAttributeKeys.join(", ")}
                   </p>
                 )}
                 {Object.entries(d.categoricalBreakdowns).map(([key, counts]) => (
                   <div key={key} className="mt-2 text-sm">
-                    <p className="font-medium text-gray-700">{key}</p>
-                    <ul className="list-inside list-disc text-gray-600">
+                    <p className="font-medium text-foreground">{key}</p>
+                    <ul className="list-inside list-disc text-muted">
                       {Object.entries(counts).map(([value, count]) => (
                         <li key={value}>
                           {value}: {count}
@@ -146,12 +135,11 @@ export default async function CampaignBriefPage({
               </div>
             ))}
           </div>
-        </section>
+        </Card>
 
-        <section className="rounded border border-gray-200 p-4">
-          <p className="mb-3 text-sm font-medium">Marketing Strategy</p>
+        <Card title="Marketing Strategy">
           {existingStrategy && (
-            <p className="mb-3 text-sm text-gray-600">
+            <p className="mb-3 text-sm text-muted">
               Current strategy:{" "}
               <Link href={`/campaigns/${campaignId}/strategy`} className="underline">
                 version {existingStrategy.version} ({existingStrategy.status})
@@ -159,8 +147,8 @@ export default async function CampaignBriefPage({
             </p>
           )}
           <GenerateStrategyButton campaignId={campaignId} />
-        </section>
+        </Card>
       </div>
-    </div>
+    </PageContainer>
   );
 }

@@ -1,5 +1,4 @@
-import { redirect, notFound } from "next/navigation";
-import { requireHumanActor, UnauthenticatedError } from "@/lib/actor";
+import { notFound } from "next/navigation";
 import { getCampaignDetail, CampaignNotFoundError } from "@/server/services/campaign-service";
 import { listDatasets } from "@/server/services/dataset-service";
 import { DatasetSelectStep } from "@/components/campaign/wizard/dataset-select-step";
@@ -11,15 +10,6 @@ export default async function CampaignDatasetsPage({
 }: {
   params: Promise<{ campaignId: string }>;
 }) {
-  try {
-    await requireHumanActor();
-  } catch (err) {
-    if (err instanceof UnauthenticatedError) {
-      redirect("/login");
-    }
-    throw err;
-  }
-
   const { campaignId } = await params;
 
   let detail;

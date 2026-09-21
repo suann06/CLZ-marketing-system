@@ -1,5 +1,5 @@
-import { notFound, redirect } from "next/navigation";
-import { requireHumanActor, UnauthenticatedError } from "@/lib/actor";
+import Link from "next/link";
+import { notFound } from "next/navigation";
 import { getCampaignDetail, CampaignNotFoundError } from "@/server/services/campaign-service";
 import {
   getCampaignPerformance,
@@ -23,15 +23,6 @@ export default async function CampaignPerformancePage({
 }: {
   params: Promise<{ campaignId: string }>;
 }) {
-  try {
-    await requireHumanActor();
-  } catch (err) {
-    if (err instanceof UnauthenticatedError) {
-      redirect("/login");
-    }
-    throw err;
-  }
-
   const { campaignId } = await params;
 
   let detail;
@@ -53,7 +44,16 @@ export default async function CampaignPerformancePage({
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
       <h1 className="mb-1 text-xl font-semibold">Campaign Performance</h1>
-      <p className="mb-6 text-sm text-gray-500">{detail.campaign.name}</p>
+      <p className="mb-1 text-sm text-gray-500">{detail.campaign.name}</p>
+      <p className="mb-6 text-sm">
+        <Link href={`/campaigns/${campaignId}/leads`} className="underline">
+          ← Back to Leads
+        </Link>{" "}
+        ·{" "}
+        <Link href="/feedback" className="underline">
+          View Feedback →
+        </Link>
+      </p>
 
       {/* A. Campaign funnel + conversion rates + sales value */}
       <section className="mb-8 rounded border border-gray-200 p-4">

@@ -1,5 +1,3 @@
-import { redirect } from "next/navigation";
-import { requireHumanActor, UnauthenticatedError } from "@/lib/actor";
 import {
   compareCampaigns,
   compareDatasets,
@@ -33,15 +31,6 @@ function Highlight({ label, highlight }: { label: string; highlight: { id: strin
 }
 
 export default async function FeedbackPage() {
-  try {
-    await requireHumanActor();
-  } catch (err) {
-    if (err instanceof UnauthenticatedError) {
-      redirect("/login");
-    }
-    throw err;
-  }
-
   const [campaigns, datasets, creatives, summary] = await Promise.all([
     compareCampaigns(),
     compareDatasets(),

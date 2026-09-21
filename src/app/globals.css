@@ -1,13 +1,40 @@
 @import "tailwindcss";
 
+/* Phase 4A design tokens. Additive to the original 2-token system
+   (--background/--foreground) — nothing existing was removed, so any
+   class using those two tokens keeps working unchanged. */
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --surface: #ffffff;
+  --surface-muted: #f9fafb;
+  --border: #e5e7eb;
+  --primary: #111827;
+  --primary-foreground: #ffffff;
+  --success: #16a34a;
+  --success-bg: #dcfce7;
+  --warning: #b45309;
+  --warning-bg: #fef3c7;
+  --error: #dc2626;
+  --error-bg: #fee2e2;
+  --muted: #6b7280;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-success: var(--success);
+  --color-success-bg: var(--success-bg);
+  --color-warning: var(--warning);
+  --color-warning-bg: var(--warning-bg);
+  --color-error: var(--error);
+  --color-error-bg: var(--error-bg);
+  --color-muted: var(--muted);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -16,11 +43,23 @@
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --surface: #111113;
+    --surface-muted: #1a1a1d;
+    --border: #27272a;
+    --primary: #f4f4f5;
+    --primary-foreground: #111113;
+    --success: #4ade80;
+    --success-bg: #052e16;
+    --warning: #fbbf24;
+    --warning-bg: #451a03;
+    --error: #f87171;
+    --error-bg: #450a0a;
+    --muted: #a1a1aa;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }

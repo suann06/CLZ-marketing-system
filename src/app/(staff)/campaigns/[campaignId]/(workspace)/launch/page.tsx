@@ -1,5 +1,4 @@
 import { notFound, redirect } from "next/navigation";
-import { requireHumanActor, UnauthenticatedError } from "@/lib/actor";
 import { CampaignNotFoundError, getCampaignDetail } from "@/server/services/campaign-service";
 import {
   getApprovedMarketingStrategy,
@@ -12,6 +11,8 @@ import {
 import { getLaunchesForCampaign } from "@/server/services/launch-service";
 import { contentSetOutputSchema } from "@/server/ai/schemas/content-set-output";
 import { LaunchPanel } from "@/components/campaign/launch/launch-panel";
+import { PageContainer } from "@/components/layout/page-container";
+import { ErrorState } from "@/components/ui/error-state";
 
 export const dynamic = "force-dynamic";
 
@@ -20,15 +21,6 @@ export default async function CampaignLaunchPage({
 }: {
   params: Promise<{ campaignId: string }>;
 }) {
-  try {
-    await requireHumanActor();
-  } catch (err) {
-    if (err instanceof UnauthenticatedError) {
-      redirect("/login");
-    }
-    throw err;
-  }
-
   const { campaignId } = await params;
 
   let detail;
@@ -64,11 +56,9 @@ export default async function CampaignLaunchPage({
   const parsed = contentSetOutputSchema.safeParse(approvedContentSet.content);
   if (!parsed.success) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-10">
-        <p className="text-sm text-red-600">
-          The approved content set&apos;s stored content could not be displayed (unexpected shape).
-        </p>
-      </div>
+      <PageContainer maxWidth="max-w-3xl">
+        <ErrorState message="The approved content set's stored content could not be displayed (unexpected shape)." />
+      </PageContainer>
     );
   }
 

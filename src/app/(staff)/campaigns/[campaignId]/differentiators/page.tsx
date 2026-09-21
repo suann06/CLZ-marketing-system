@@ -1,5 +1,4 @@
-import { redirect, notFound } from "next/navigation";
-import { requireHumanActor, UnauthenticatedError } from "@/lib/actor";
+import { notFound } from "next/navigation";
 import { getCampaignDetail, CampaignNotFoundError } from "@/server/services/campaign-service";
 import { DifferentiatorsStep } from "@/components/campaign/wizard/differentiators-step";
 
@@ -10,15 +9,6 @@ export default async function CampaignDifferentiatorsPage({
 }: {
   params: Promise<{ campaignId: string }>;
 }) {
-  try {
-    await requireHumanActor();
-  } catch (err) {
-    if (err instanceof UnauthenticatedError) {
-      redirect("/login");
-    }
-    throw err;
-  }
-
   const { campaignId } = await params;
 
   let detail;

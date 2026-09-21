@@ -1,5 +1,4 @@
 import { notFound, redirect } from "next/navigation";
-import { requireHumanActor, UnauthenticatedError } from "@/lib/actor";
 import { CampaignNotFoundError } from "@/server/services/campaign-service";
 import {
   getApprovedMarketingStrategy,
@@ -12,6 +11,8 @@ import {
 import { contentSetOutputSchema } from "@/server/ai/schemas/content-set-output";
 import { GenerateContentButton } from "@/components/campaign/content/generate-content-button";
 import { ContentReviewPanel } from "@/components/campaign/content/content-review-panel";
+import { PageContainer } from "@/components/layout/page-container";
+import { ErrorState } from "@/components/ui/error-state";
 
 export const dynamic = "force-dynamic";
 
@@ -20,15 +21,6 @@ export default async function CampaignContentPage({
 }: {
   params: Promise<{ campaignId: string }>;
 }) {
-  try {
-    await requireHumanActor();
-  } catch (err) {
-    if (err instanceof UnauthenticatedError) {
-      redirect("/login");
-    }
-    throw err;
-  }
-
   const { campaignId } = await params;
 
   let contentSet;
@@ -56,11 +48,11 @@ export default async function CampaignContentPage({
       }
 
       return (
-        <div className="mx-auto max-w-3xl px-4 py-10">
-          <h1 className="mb-1 text-xl font-semibold">Marketing Content</h1>
-          <p className="mb-6 text-sm text-gray-500">No content has been generated yet.</p>
+        <PageContainer maxWidth="max-w-3xl">
+          <h2 className="mb-1 text-lg font-semibold">Content</h2>
+          <p className="mb-6 text-sm text-muted">No content has been generated yet.</p>
           <GenerateContentButton campaignId={campaignId} />
-        </div>
+        </PageContainer>
       );
     }
     throw err;
@@ -69,11 +61,9 @@ export default async function CampaignContentPage({
   const parsed = contentSetOutputSchema.safeParse(contentSet.content);
   if (!parsed.success) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-10">
-        <p className="text-sm text-red-600">
-          This content set&apos;s stored content could not be displayed (unexpected shape).
-        </p>
-      </div>
+      <PageContainer maxWidth="max-w-3xl">
+        <ErrorState message="This content set's stored content could not be displayed (unexpected shape)." />
+      </PageContainer>
     );
   }
 

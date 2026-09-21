@@ -1,5 +1,4 @@
 import { redirect, notFound } from "next/navigation";
-import { requireHumanActor, UnauthenticatedError } from "@/lib/actor";
 import { CampaignNotFoundError } from "@/server/services/campaign-service";
 import {
   getLatestMarketingStrategy,
@@ -11,6 +10,8 @@ import {
   getLatestContentSet,
   ContentSetNotFoundError,
 } from "@/server/services/content-generation-service";
+import { PageContainer } from "@/components/layout/page-container";
+import { ErrorState } from "@/components/ui/error-state";
 
 export const dynamic = "force-dynamic";
 
@@ -19,15 +20,6 @@ export default async function CampaignStrategyPage({
 }: {
   params: Promise<{ campaignId: string }>;
 }) {
-  try {
-    await requireHumanActor();
-  } catch (err) {
-    if (err instanceof UnauthenticatedError) {
-      redirect("/login");
-    }
-    throw err;
-  }
-
   const { campaignId } = await params;
 
   let strategy;
@@ -48,11 +40,9 @@ export default async function CampaignStrategyPage({
     // Should not happen — content is validated before it's ever saved — but
     // fail safely rather than crashing the page if it somehow did.
     return (
-      <div className="mx-auto max-w-3xl px-4 py-10">
-        <p className="text-sm text-red-600">
-          This strategy&apos;s stored content could not be displayed (unexpected shape).
-        </p>
-      </div>
+      <PageContainer maxWidth="max-w-3xl">
+        <ErrorState message="This strategy's stored content could not be displayed (unexpected shape)." />
+      </PageContainer>
     );
   }
 

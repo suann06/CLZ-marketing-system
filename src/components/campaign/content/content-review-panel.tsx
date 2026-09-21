@@ -8,6 +8,12 @@ import {
   type ContentSetOutput,
   type ContentVariant,
 } from "@/server/ai/schemas/content-set-output";
+import { PageContainer } from "@/components/layout/page-container";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 type Platform = keyof ContentSetOutput;
 const PLATFORMS: Platform[] = ["facebook", "instagram", "tiktok", "whatsapp"];
@@ -27,12 +33,6 @@ const EMPTY_VARIANT: ContentVariant = {
   notes: "",
 };
 
-const STATUS_STYLES: Record<string, string> = {
-  draft: "bg-gray-100 text-gray-700",
-  approved: "bg-green-100 text-green-700",
-  archived: "bg-gray-100 text-gray-400",
-};
-
 function HashtagEditor({
   hashtags,
   onChange,
@@ -42,35 +42,26 @@ function HashtagEditor({
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-xs font-medium text-gray-600">Hashtags (optional)</p>
+      <p className="text-xs font-medium text-muted">Hashtags (optional)</p>
       {hashtags.map((value, index) => (
         <div key={index} className="flex gap-2">
-          <input
+          <Input
             value={value}
             onChange={(e) => {
               const next = [...hashtags];
               next[index] = e.target.value;
               onChange(next);
             }}
-            className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm outline-none focus:border-gray-500"
+            className="flex-1"
           />
-          <button
-            type="button"
-            onClick={() => onChange(hashtags.filter((_, i) => i !== index))}
-            aria-label="Remove hashtag"
-            className="rounded border border-gray-300 px-2 py-1 text-xs text-gray-500 hover:bg-gray-50"
-          >
+          <Button type="button" variant="secondary" size="sm" onClick={() => onChange(hashtags.filter((_, i) => i !== index))} aria-label="Remove hashtag">
             ×
-          </button>
+          </Button>
         </div>
       ))}
-      <button
-        type="button"
-        onClick={() => onChange([...hashtags, ""])}
-        className="self-start rounded border border-gray-300 px-2 py-1 text-xs font-medium hover:bg-gray-50"
-      >
+      <Button type="button" variant="secondary" size="sm" className="self-start" onClick={() => onChange([...hashtags, ""])}>
         + Add hashtag
-      </button>
+      </Button>
     </div>
   );
 }
@@ -222,97 +213,73 @@ export function ContentReviewPanel({
   const canApprove = useMemo(() => contentSetOutputSchema.safeParse(content).success, [content]);
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10">
-      <h1 className="mb-1 text-xl font-semibold">Marketing Content</h1>
-      <p className="mb-6 text-sm text-gray-500">
-        Version {version} ·{" "}
-        <span
-          className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_STYLES[status] ?? ""}`}
-        >
-          {status}
-        </span>
-      </p>
+    <PageContainer maxWidth="max-w-3xl">
+      <div className="mb-6 flex items-center gap-3">
+        <h2 className="text-lg font-semibold">Content</h2>
+        <span className="text-sm text-muted">Version {version}</span>
+        <Badge status={status}>{status}</Badge>
+      </div>
 
       {mode === "view" ? (
         <>
           <div className="flex flex-col gap-6">
             {PLATFORMS.map((platform) => (
-              <section key={platform} className="rounded border border-gray-200 p-4">
-                <p className="mb-3 text-sm font-semibold">
-                  {PLATFORM_LABELS[platform]} ({content[platform].length})
-                </p>
+              <Card key={platform} title={`${PLATFORM_LABELS[platform]} (${content[platform].length})`}>
                 <div className="flex flex-col gap-4">
                   {content[platform].map((variant, i) => (
-                    <div key={i} className="rounded border border-gray-100 p-3">
-                      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-400">
+                    <div key={i} className="rounded border border-border p-3">
+                      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">
                         {variant.variantLabel}
                       </p>
-                      <p className="mb-1 text-sm font-medium text-gray-800">{variant.headline}</p>
-                      <p className="mb-2 text-sm text-gray-600">{variant.bodyText}</p>
-                      <p className="mb-2 text-sm font-medium text-gray-700">CTA: {variant.cta}</p>
+                      <p className="mb-1 text-sm font-medium text-foreground">{variant.headline}</p>
+                      <p className="mb-2 text-sm text-muted">{variant.bodyText}</p>
+                      <p className="mb-2 text-sm font-medium text-foreground">CTA: {variant.cta}</p>
                       {variant.hashtags && variant.hashtags.length > 0 && (
-                        <p className="mb-2 text-sm text-gray-500">{variant.hashtags.join(" ")}</p>
+                        <p className="mb-2 text-sm text-muted">{variant.hashtags.join(" ")}</p>
                       )}
                       {variant.notes && (
-                        <div className="mt-2 rounded bg-yellow-50 p-2">
-                          <p className="text-xs font-medium uppercase tracking-wide text-yellow-700">
+                        <div className="mt-2 rounded bg-warning-bg p-2">
+                          <p className="text-xs font-medium uppercase tracking-wide text-warning">
                             Internal note — not customer-facing
                           </p>
-                          <p className="text-xs text-yellow-800">{variant.notes}</p>
+                          <p className="text-xs text-warning">{variant.notes}</p>
                         </div>
                       )}
                     </div>
                   ))}
                 </div>
-              </section>
+              </Card>
             ))}
           </div>
 
-          {formError && <p className="mt-4 text-sm text-red-600">{formError}</p>}
+          {formError && <p className="mt-4 text-sm text-error">{formError}</p>}
 
           {status === "draft" && (
             <div className="mt-6 flex flex-col gap-3">
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-muted">
                 {variantCounts.map(({ platform, count }) => `${PLATFORM_LABELS[platform]}: ${count}`).join(" · ")}
               </p>
               <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={startEdit}
-                  className="rounded border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
-                >
+                <Button type="button" variant="secondary" onClick={startEdit}>
                   Edit
-                </button>
+                </Button>
                 {!canApprove ? (
-                  <p className="text-sm text-red-600">
+                  <p className="text-sm text-error">
                     Every platform needs at least one complete variant before this can be approved.
                   </p>
                 ) : !confirmingApprove ? (
-                  <button
-                    type="button"
-                    onClick={() => setConfirmingApprove(true)}
-                    className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white"
-                  >
+                  <Button type="button" onClick={() => setConfirmingApprove(true)}>
                     Approve
-                  </button>
+                  </Button>
                 ) : (
                   <div className="flex items-center gap-2 text-sm">
                     <span>Confirm approval?</span>
-                    <button
-                      type="button"
-                      onClick={handleApprove}
-                      disabled={submitting}
-                      className="rounded bg-gray-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-                    >
+                    <Button type="button" size="sm" onClick={handleApprove} isLoading={submitting}>
                       {submitting ? "Approving…" : "Yes, approve"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmingApprove(false)}
-                      className="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50"
-                    >
+                    </Button>
+                    <Button type="button" variant="secondary" size="sm" onClick={() => setConfirmingApprove(false)}>
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>
@@ -320,11 +287,8 @@ export function ContentReviewPanel({
           )}
           {status === "approved" && (
             <div className="mt-6">
-              <Link
-                href={`/campaigns/${campaignId}/launch`}
-                className="inline-block rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white"
-              >
-                Proceed to Launch
+              <Link href={`/campaigns/${campaignId}/launch`}>
+                <Button type="button">Proceed to Launch</Button>
               </Link>
             </div>
           )}
@@ -332,100 +296,80 @@ export function ContentReviewPanel({
       ) : (
         <div className="flex flex-col gap-8">
           {PLATFORMS.map((platform) => (
-            <section key={platform} className="rounded border border-gray-200 p-4">
-              <p className="mb-3 text-sm font-semibold">
-                {PLATFORM_LABELS[platform]} ({draft[platform].length})
-              </p>
+            <Card key={platform} title={`${PLATFORM_LABELS[platform]} (${draft[platform].length})`}>
               <div className="flex flex-col gap-4">
                 {draft[platform].map((variant, index) => (
-                  <div key={index} className="flex flex-col gap-2 rounded border border-gray-100 p-3">
+                  <div key={index} className="flex flex-col gap-2 rounded border border-border p-3">
                     <div className="flex gap-2">
-                      <input
+                      <Input
                         value={variant.variantLabel}
                         onChange={(e) => updateVariant(platform, index, { variantLabel: e.target.value })}
                         placeholder="Variant label (e.g. Angle: Speed)"
-                        className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
+                        className="flex-1"
                       />
-                      <button
+                      <Button
                         type="button"
+                        variant="secondary"
                         onClick={() => removeVariant(platform, index)}
                         aria-label="Remove variant"
-                        className="rounded border border-gray-300 px-3 py-2 text-sm text-gray-500 hover:bg-gray-50"
                       >
                         × Remove variant
-                      </button>
+                      </Button>
                     </div>
-                    <input
+                    <Input
                       value={variant.headline}
                       onChange={(e) => updateVariant(platform, index, { headline: e.target.value })}
                       placeholder="Headline"
-                      className="rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
                     />
-                    <textarea
+                    <Textarea
                       value={variant.bodyText}
                       onChange={(e) => updateVariant(platform, index, { bodyText: e.target.value })}
                       placeholder="Body text"
                       rows={3}
-                      className="rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
                     />
-                    <input
+                    <Input
                       value={variant.cta}
                       onChange={(e) => updateVariant(platform, index, { cta: e.target.value })}
                       placeholder="CTA"
-                      className="rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
                     />
                     <HashtagEditor
                       hashtags={variant.hashtags ?? []}
                       onChange={(hashtags) => updateVariant(platform, index, { hashtags })}
                     />
                     <div>
-                      <p className="mb-1 text-xs font-medium text-yellow-700">
+                      <p className="mb-1 text-xs font-medium text-warning">
                         Internal note — not customer-facing
                       </p>
-                      <textarea
+                      <Textarea
                         value={variant.notes ?? ""}
                         onChange={(e) => updateVariant(platform, index, { notes: e.target.value })}
                         placeholder="Reviewer notes (optional)"
                         rows={2}
-                        className="w-full rounded border border-yellow-200 bg-yellow-50 px-3 py-2 text-sm outline-none focus:border-yellow-400"
+                        className="w-full border-warning bg-warning-bg"
                       />
                     </div>
                   </div>
                 ))}
               </div>
-              <button
-                type="button"
-                onClick={() => addVariant(platform)}
-                className="mt-3 self-start rounded border border-gray-300 px-3 py-1 text-xs font-medium hover:bg-gray-50"
-              >
+              <Button type="button" variant="secondary" size="sm" className="mt-3 self-start" onClick={() => addVariant(platform)}>
                 + Add {PLATFORM_LABELS[platform]} variant
-              </button>
-            </section>
+              </Button>
+            </Card>
           ))}
 
-          {formError && <p className="text-sm text-red-600">{formError}</p>}
+          {formError && <p className="text-sm text-error">{formError}</p>}
 
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={submitting}
-              className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-            >
+            <Button type="button" onClick={handleSave} isLoading={submitting}>
               {submitting ? "Saving…" : "Save Changes"}
-            </button>
-            <button
-              type="button"
-              onClick={cancelEdit}
-              disabled={submitting}
-              className="rounded border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
-            >
+            </Button>
+            <Button type="button" variant="secondary" onClick={cancelEdit} disabled={submitting}>
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }
 
