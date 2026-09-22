@@ -24,17 +24,17 @@ export function Breadcrumbs() {
   }
 
   return (
-    <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1 overflow-x-auto text-sm text-muted">
+    <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 overflow-x-auto text-sm text-muted">
       {segments.map((segment, index) => {
         const href = `/${segments.slice(0, index + 1).join("/")}`;
         const isLast = index === segments.length - 1;
         return (
-          <span key={href} className="flex shrink-0 items-center gap-1">
-            {index > 0 && <span aria-hidden>/</span>}
+          <span key={href} className="flex shrink-0 items-center gap-1.5">
+            {index > 0 && <span aria-hidden className="text-border-strong">/</span>}
             {isLast ? (
               <span className="font-medium text-foreground">{segmentLabel(segment)}</span>
             ) : (
-              <Link href={href} className="hover:text-foreground">
+              <Link href={href} className="transition-colors duration-150 hover:text-foreground">
                 {segmentLabel(segment)}
               </Link>
             )}

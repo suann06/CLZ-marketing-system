@@ -31,11 +31,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div
             key={t.id}
             role="status"
-            className={`pointer-events-auto rounded border px-4 py-2 text-sm shadow-lg ${
+            className={`anim-slide-in-right shadow-elevated pointer-events-auto rounded-[14px] border px-4 py-2.5 text-sm ${
               t.variant === "success"
-                ? "border-green-200 bg-success-bg text-success"
+                ? "border-success/20 bg-success-bg text-success"
                 : t.variant === "error"
-                  ? "border-red-200 bg-error-bg text-error"
+                  ? "border-error/20 bg-error-bg text-error"
                   : "border-border bg-surface text-foreground"
             }`}
           >

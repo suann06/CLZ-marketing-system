@@ -1,6 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { getCampaignDetail, CampaignNotFoundError } from "@/server/services/campaign-service";
 import { ReviewStep, type ReviewBuildingGroup } from "@/components/campaign/wizard/review-step";
+import { computeCompletedSteps } from "@/components/campaign/wizard/wizard-steps";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +57,7 @@ export default async function CampaignReviewPage({
       datasetNames={datasetNames}
       buildingGroups={buildingGroups}
       totalBuildingCount={detail.buildings.length}
+      completedSteps={computeCompletedSteps(detail)}
     />
   );
 }

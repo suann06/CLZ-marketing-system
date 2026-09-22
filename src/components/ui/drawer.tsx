@@ -19,17 +19,19 @@ export function Drawer({
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex bg-black/40 ${side === "right" ? "justify-end" : "justify-start"}`}
+      className={`anim-fade fixed inset-0 z-50 flex bg-black/60 ${side === "right" ? "justify-end" : "justify-start"}`}
       onClick={onClose}
       role="presentation"
     >
       <div
         role="dialog"
         aria-modal="true"
-        className="h-full w-full max-w-xs overflow-y-auto border-border bg-surface p-6 shadow-lg"
+        className={`anim-slide-in-right shadow-elevated h-full w-full max-w-xs overflow-y-auto bg-surface p-6 ${
+          side === "right" ? "rounded-l-[20px]" : "rounded-r-[20px]"
+        }`}
         onClick={(event) => event.stopPropagation()}
       >
-        {title && <p className="mb-4 text-base font-semibold">{title}</p>}
+        {title && <p className="mb-4 text-base font-semibold text-foreground">{title}</p>}
         {children}
       </div>
     </div>

@@ -15,6 +15,10 @@ export type CampaignListItem = {
   startDateLabel: string;
   endDateLabel: string;
   href: string;
+  totalLeads: number;
+  wonSales: number;
+  lostSales: number;
+  totalSalesValue: string;
 };
 
 // Client-side search/filter only — over the exact list already fetched by
@@ -41,7 +45,7 @@ export function CampaignList({ campaigns }: { campaigns: CampaignListItem[] }) {
 
   return (
     <div>
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
         <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -70,31 +74,45 @@ export function CampaignList({ campaigns }: { campaigns: CampaignListItem[] }) {
           description="Try a different name, product/promotion, or status filter."
         />
       ) : (
-        <div className="overflow-x-auto rounded border border-border">
-          <table className="w-full text-sm">
-            <thead className="bg-surface-muted text-left text-xs uppercase tracking-wide text-muted">
+        <div className="overflow-x-auto rounded-2xl border border-border">
+          <table className="w-full min-w-[860px] text-sm">
+            <thead className="bg-surface-muted text-left text-xs text-muted">
               <tr>
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Product / Promotion</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Start Date</th>
-                <th className="px-4 py-3">End Date</th>
+                <th className="px-4 py-3 font-medium">Name</th>
+                <th className="px-4 py-3 font-medium">Product / promotion</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 text-right font-medium">Leads</th>
+                <th className="px-4 py-3 text-right font-medium">Won / Lost</th>
+                <th className="px-4 py-3 text-right font-medium">Sales value</th>
+                <th className="px-4 py-3 font-medium">Start date</th>
+                <th className="px-4 py-3 font-medium">End date</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {filtered.map((campaign) => (
-                <tr key={campaign.id} className="hover:bg-surface-muted">
-                  <td className="px-4 py-3 font-medium">
+                <tr key={campaign.id} className="transition-colors duration-150 hover:bg-surface-raised">
+                  <td className="px-4 py-3.5 font-medium text-foreground">
                     <Link href={campaign.href} className="hover:underline">
                       {campaign.name}
                     </Link>
                   </td>
-                  <td className="px-4 py-3 text-muted">{campaign.productPromotion}</td>
-                  <td className="px-4 py-3">
-                    <Badge status={campaign.status}>{campaign.status.replace("_", " ")}</Badge>
+                  <td className="px-4 py-3.5 text-secondary">{campaign.productPromotion}</td>
+                  <td className="px-4 py-3.5">
+                    <Badge variant="dot" status={campaign.status}>
+                      {campaign.status.replace("_", " ")}
+                    </Badge>
                   </td>
-                  <td className="px-4 py-3 text-muted">{campaign.startDateLabel}</td>
-                  <td className="px-4 py-3 text-muted">{campaign.endDateLabel}</td>
+                  <td className="px-4 py-3.5 text-right font-mono tabular-nums text-foreground">
+                    {campaign.totalLeads}
+                  </td>
+                  <td className="px-4 py-3.5 text-right font-mono tabular-nums text-foreground">
+                    {campaign.wonSales} / {campaign.lostSales}
+                  </td>
+                  <td className="px-4 py-3.5 text-right font-mono tabular-nums text-foreground">
+                    RM {campaign.totalSalesValue}
+                  </td>
+                  <td className="px-4 py-3.5 font-mono text-xs text-muted">{campaign.startDateLabel}</td>
+                  <td className="px-4 py-3.5 font-mono text-xs text-muted">{campaign.endDateLabel}</td>
                 </tr>
               ))}
             </tbody>

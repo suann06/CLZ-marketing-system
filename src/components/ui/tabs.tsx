@@ -13,7 +13,7 @@ export function Tabs({ tabs, defaultTab }: { tabs: TabItem[]; defaultTab?: strin
 
   return (
     <div>
-      <div role="tablist" className="mb-4 flex gap-1 overflow-x-auto border-b border-border">
+      <div role="tablist" className="mb-5 flex gap-6 overflow-x-auto border-b border-border">
         {tabs.map((tab) => (
           <button
             key={tab.key}
@@ -21,10 +21,10 @@ export function Tabs({ tabs, defaultTab }: { tabs: TabItem[]; defaultTab?: strin
             role="tab"
             aria-selected={active === tab.key}
             onClick={() => setActive(tab.key)}
-            className={`-mb-px shrink-0 border-b-2 px-3 py-2 text-sm font-medium ${
+            className={`-mb-px shrink-0 border-b-2 pb-2.5 text-sm font-medium transition-colors duration-150 ${
               active === tab.key
                 ? "border-primary text-foreground"
-                : "border-transparent text-muted hover:text-foreground"
+                : "border-transparent text-secondary hover:text-foreground"
             }`}
           >
             {tab.label}

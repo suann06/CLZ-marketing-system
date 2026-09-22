@@ -78,7 +78,18 @@ function pickExtreme<T>(
 export type CampaignComparisonEntry = {
   campaignId: string;
   campaignName: string;
+  // Phase 4E: exposes fields getCampaignPerformance() already computes
+  // internally (see campaign-performance-service.ts) but this entry
+  // previously didn't surface — needed by the Dashboard's global KPIs/
+  // funnel/Campaign Overview so they can sum across campaigns without
+  // recomputing anything.
+  campaignStatus: string;
+  totalAds: number;
   totalClicks: number;
+  totalWhatsAppEnquiries: number;
+  totalLeads: number;
+  totalApplications: number;
+  totalQualifiedLeads: number;
   totalSales: number;
   wonSales: number;
   lostSales: number;
@@ -99,7 +110,7 @@ export type CampaignComparison = {
 // recomputing funnel logic here — "Do not duplicate functionality that
 // already exists."
 export async function compareCampaigns(): Promise<CampaignComparison> {
-  const campaigns = await prisma.campaign.findMany({ select: { id: true, name: true } });
+  const campaigns = await prisma.campaign.findMany({ select: { id: true, name: true, status: true } });
 
   const entries: CampaignComparisonEntry[] = await Promise.all(
     campaigns.map(async (c) => {
@@ -107,7 +118,13 @@ export async function compareCampaigns(): Promise<CampaignComparison> {
       return {
         campaignId: c.id,
         campaignName: c.name,
+        campaignStatus: c.status,
+        totalAds: perf.totalAds,
         totalClicks: perf.totalClicks,
+        totalWhatsAppEnquiries: perf.totalWhatsAppEnquiries,
+        totalLeads: perf.totalLeads,
+        totalApplications: perf.totalApplications,
+        totalQualifiedLeads: perf.totalQualifiedLeads,
         totalSales: perf.totalSales,
         wonSales: perf.wonSales,
         lostSales: perf.lostSales,
@@ -140,6 +157,80 @@ export async function compareCampaigns(): Promise<CampaignComparison> {
       hasClicks,
       "max",
     ),
+  };
+}
+
+export type CampaignFunnelTotals = {
+  totalAds: number;
+  totalClicks: number;
+  totalWhatsAppEnquiries: number;
+  totalLeads: number;
+  totalApplications: number;
+  totalQualifiedLeads: number;
+  totalSales: number;
+  wonSales: number;
+  totalSalesValue: string;
+  winRate: number;
+  // Derived from the already-summed stage counts (volume-weighted), not by
+  // averaging each campaign's own rate — a campaign with 1 click and 100%
+  // conversion shouldn't count as much as one with 1000 clicks and 40%.
+  // clickToAdRate is deliberately absent — same reason
+  // campaign-performance-service.ts's FunnelConversionRates omits it (no
+  // ad-impression/reach data is ever captured).
+  clickToEnquiryRate: number;
+  enquiryToApplicationRate: number;
+  applicationToQualifiedRate: number;
+  qualifiedToSaleRate: number;
+};
+
+// Phase 4E/4F: pure aggregation over compareCampaigns()'s own output —
+// sums the per-campaign funnel counts it already computed (via
+// getCampaignPerformance()) into cross-campaign totals. Used by both the
+// Dashboard (dashboard-service.ts) and the global Performance page
+// (/performance) so this summation exists in exactly one place rather
+// than being duplicated in each caller.
+export function summarizeCampaignFunnel(campaigns: CampaignComparisonEntry[]): CampaignFunnelTotals {
+  const totals = campaigns.reduce(
+    (acc, c) => {
+      acc.totalAds += c.totalAds;
+      acc.totalClicks += c.totalClicks;
+      acc.totalWhatsAppEnquiries += c.totalWhatsAppEnquiries;
+      acc.totalLeads += c.totalLeads;
+      acc.totalApplications += c.totalApplications;
+      acc.totalQualifiedLeads += c.totalQualifiedLeads;
+      acc.totalSales += c.totalSales;
+      acc.wonSales += c.wonSales;
+      acc.totalSalesValue += Number(c.totalSalesValue);
+      return acc;
+    },
+    {
+      totalAds: 0,
+      totalClicks: 0,
+      totalWhatsAppEnquiries: 0,
+      totalLeads: 0,
+      totalApplications: 0,
+      totalQualifiedLeads: 0,
+      totalSales: 0,
+      wonSales: 0,
+      totalSalesValue: 0,
+    },
+  );
+
+  return {
+    totalAds: totals.totalAds,
+    totalClicks: totals.totalClicks,
+    totalWhatsAppEnquiries: totals.totalWhatsAppEnquiries,
+    totalLeads: totals.totalLeads,
+    totalApplications: totals.totalApplications,
+    totalQualifiedLeads: totals.totalQualifiedLeads,
+    totalSales: totals.totalSales,
+    wonSales: totals.wonSales,
+    totalSalesValue: totals.totalSalesValue.toFixed(2),
+    winRate: rate(totals.wonSales, totals.totalSales),
+    clickToEnquiryRate: rate(totals.totalWhatsAppEnquiries, totals.totalClicks),
+    enquiryToApplicationRate: rate(totals.totalApplications, totals.totalWhatsAppEnquiries),
+    applicationToQualifiedRate: rate(totals.totalQualifiedLeads, totals.totalApplications),
+    qualifiedToSaleRate: rate(totals.totalSales, totals.totalQualifiedLeads),
   };
 }
 

@@ -1,7 +1,16 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { WizardShell } from "@/components/campaign/wizard/wizard-shell";
+import type { WizardStepKey } from "@/components/campaign/wizard/wizard-steps";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
 
 export type DatasetSummary = {
   id: string;
@@ -20,17 +29,20 @@ export function DatasetSelectStep({
   campaignName,
   initialDatasets,
   initialSelectedIds,
+  completedSteps,
 }: {
   campaignId: string;
   campaignName: string;
   initialDatasets: DatasetSummary[];
   initialSelectedIds: string[];
+  completedSteps: WizardStepKey[];
 }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [datasets, setDatasets] = useState<DatasetSummary[]>(initialDatasets);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(initialSelectedIds));
+  const [search, setSearch] = useState("");
 
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -132,84 +144,91 @@ export function DatasetSelectStep({
 
   const selectedDatasets = datasets.filter((d) => selectedIds.has(d.id));
 
+  // Client-side filter only, over the already-loaded list — no new query.
+  const query = search.trim().toLowerCase();
+  const filteredDatasets = useMemo(() => {
+    if (!query) return datasets;
+    return datasets.filter(
+      (d) => d.name.toLowerCase().includes(query) || d.sourceFilename.toLowerCase().includes(query),
+    );
+  }, [datasets, query]);
+
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10">
-      <h1 className="mb-1 text-xl font-semibold">{campaignName}</h1>
-      <p className="mb-6 text-sm text-gray-500">Step 3 of 6 — Select Dataset(s)</p>
-      <p className="mb-6 text-sm text-gray-600">
+    <WizardShell campaignId={campaignId} title={campaignName} currentStep="dataset" completedSteps={completedSteps}>
+      <p className="mb-6 text-sm text-muted">
         Select one or more existing building datasets to target, or upload a new one. Each
         dataset is treated independently — datasets are never merged or deduplicated against
         each other.
       </p>
 
-      <div className="mb-6 rounded border border-gray-200 p-4">
-        <p className="mb-2 text-sm font-medium">
-          Selected datasets ({selectedDatasets.length})
-        </p>
+      <Card title={`Selected datasets (${selectedDatasets.length})`} className="mb-6">
         {selectedDatasets.length === 0 ? (
-          <p className="text-sm text-gray-500">None selected yet.</p>
+          <p className="text-sm text-muted">None selected yet.</p>
         ) : (
           <ul className="flex flex-wrap gap-2">
             {selectedDatasets.map((d) => (
-              <li
-                key={d.id}
-                className="rounded-full bg-gray-900 px-3 py-1 text-xs font-medium text-white"
-              >
-                {d.name}
+              <li key={d.id}>
+                <Badge>{d.name}</Badge>
               </li>
             ))}
           </ul>
         )}
-      </div>
+      </Card>
 
-      <form onSubmit={handleUpload} className="mb-8 flex flex-col gap-2 rounded border border-gray-200 p-4">
-        <p className="text-sm font-medium">Upload a new dataset</p>
-        <div className="flex gap-2">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv,.xlsx,.xlsm,.xls"
-            className="flex-1 text-sm"
-          />
-          <button
-            type="submit"
-            disabled={uploading}
-            className="rounded border border-gray-300 px-3 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
-          >
-            {uploading ? "Uploading…" : "Upload"}
-          </button>
-        </div>
-        {uploadError && <p className="text-sm text-red-600">{uploadError}</p>}
+      <form onSubmit={handleUpload} className="mb-8">
+        <Card title="Upload a new dataset">
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,.xlsx,.xlsm,.xls"
+              className="flex-1 text-sm"
+            />
+            <Button type="submit" variant="secondary" isLoading={uploading}>
+              {uploading ? "Uploading…" : "Upload"}
+            </Button>
+          </div>
+          {uploadError && <p className="mt-2 text-sm text-error">{uploadError}</p>}
+        </Card>
       </form>
 
       <div className="mb-6">
-        <p className="mb-2 text-sm font-medium">Existing datasets</p>
+        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm font-medium">Existing datasets ({datasets.length})</p>
+          {datasets.length > 0 && (
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name or filename…"
+              aria-label="Search datasets"
+              className="sm:max-w-xs"
+            />
+          )}
+        </div>
+
         {datasets.length === 0 ? (
-          <p className="rounded border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-500">
-            No datasets yet. Upload one above.
-          </p>
+          <EmptyState title="No datasets yet" description="Upload one above to get started." />
+        ) : filteredDatasets.length === 0 ? (
+          <EmptyState title="No datasets match your search" description="Try a different name or filename." />
         ) : (
-          <ul className="divide-y divide-gray-200 rounded border border-gray-200">
-            {datasets.map((d) => {
+          <ul className="divide-y divide-border rounded border border-border">
+            {filteredDatasets.map((d) => {
               const checked = selectedIds.has(d.id);
               return (
                 <li key={d.id}>
                   <label
                     className={`flex cursor-pointer items-center gap-3 px-4 py-3 text-sm ${
-                      checked ? "bg-gray-50" : ""
+                      checked ? "bg-accent-subtle" : ""
                     }`}
                   >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleSelected(d.id)}
-                    />
+                    <input type="checkbox" checked={checked} onChange={() => toggleSelected(d.id)} />
                     <span className="flex-1">
                       <span className="font-medium">{d.name}</span>
-                      <span className="ml-2 text-gray-500">
+                      <span className="ml-2 text-muted">
                         {d.sourceFilename} · {d.rowCount} buildings · {formatDate(d.importedAt)}
                       </span>
                     </span>
+                    {checked && <Badge status="approved">Selected</Badge>}
                   </label>
                 </li>
               );
@@ -218,16 +237,18 @@ export function DatasetSelectStep({
         )}
       </div>
 
-      {formError && <p className="mb-4 text-sm text-red-600">{formError}</p>}
+      {formError && <ErrorState message={formError} />}
 
-      <button
-        type="button"
-        onClick={handleContinue}
-        disabled={submitting}
-        className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-      >
-        {submitting ? "Saving…" : "Continue"}
-      </button>
-    </div>
+      <div className="mt-6 flex items-center gap-3">
+        <Link href={`/campaigns/${campaignId}/differentiators`}>
+          <Button type="button" variant="secondary">
+            Back
+          </Button>
+        </Link>
+        <Button type="button" onClick={handleContinue} isLoading={submitting}>
+          {submitting ? "Saving…" : "Continue"}
+        </Button>
+      </div>
+    </WizardShell>
   );
 }

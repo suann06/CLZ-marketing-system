@@ -26,17 +26,17 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      className="anim-fade fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
       onClick={onClose}
       role="presentation"
     >
       <div
         role="dialog"
         aria-modal="true"
-        className="w-full max-w-md rounded border border-border bg-surface p-6 shadow-lg"
+        className="anim-scale-in shadow-elevated w-full max-w-md rounded-[20px] border border-border bg-surface p-6"
         onClick={(event) => event.stopPropagation()}
       >
-        {title && <p className="mb-4 text-base font-semibold">{title}</p>}
+        {title && <p className="mb-4 text-base font-semibold text-foreground">{title}</p>}
         {children}
       </div>
     </div>

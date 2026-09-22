@@ -8,8 +8,10 @@ import type { StatusKind } from "@/components/ui/status";
 
 export const dynamic = "force-dynamic";
 
-// Persistent header + tab nav shared by brief(Overview)/strategy/content/
-// launch/leads/applications/performance — kept out of buildings/datasets/
+// Persistent header + tab nav shared by every workspace tab — Overview
+// (brief)/Strategy/Content & Creatives (content)/Targeting & Buildings
+// (targeting)/Performance/Leads/Sales, per the approved Dark Olive Luxury
+// IA (see workspace-nav.tsx) — kept out of buildings/datasets/
 // differentiators/review (the Phase 4C creation wizard) by living in this
 // (workspace) route group, which does not affect the URL. Read-only: fetches
 // campaign detail + the already-built campaign-performance-service.ts once
@@ -42,6 +44,7 @@ export default async function CampaignWorkspaceLayout({
   return (
     <div className="flex min-h-full flex-col">
       <CampaignWorkspaceHeader
+        campaignId={campaignId}
         name={campaign.name}
         productPromotion={campaign.productPromotion}
         status={campaign.status as StatusKind}
@@ -51,7 +54,9 @@ export default async function CampaignWorkspaceLayout({
           { label: "Clicks", value: String(performance.totalClicks) },
           { label: "WhatsApp Enquiries", value: String(performance.totalWhatsAppEnquiries) },
           { label: "Applications", value: String(performance.totalApplications) },
+          { label: "Qualified Leads", value: String(performance.totalQualifiedLeads) },
           { label: "Won Sales", value: `${performance.wonSales} (RM ${performance.totalSalesValue})` },
+          { label: "Win Rate", value: `${(performance.winRate * 100).toFixed(1)}%` },
         ]}
       />
       <CampaignWorkspaceNav campaignId={campaignId} />

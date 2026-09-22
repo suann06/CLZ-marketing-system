@@ -3,6 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { WizardShell } from "@/components/campaign/wizard/wizard-shell";
+import type { WizardStepKey } from "@/components/campaign/wizard/wizard-steps";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ErrorState } from "@/components/ui/error-state";
 
 export type ReviewBuildingGroup = {
   datasetId: string;
@@ -19,6 +25,7 @@ export function ReviewStep({
   datasetNames,
   buildingGroups,
   totalBuildingCount,
+  completedSteps,
 }: {
   campaignId: string;
   campaignName: string;
@@ -28,6 +35,7 @@ export function ReviewStep({
   datasetNames: string[];
   buildingGroups: ReviewBuildingGroup[];
   totalBuildingCount: number;
+  completedSteps: WizardStepKey[];
 }) {
   const router = useRouter();
 
@@ -52,6 +60,7 @@ export function ReviewStep({
         setFormError(
           typeof body?.error === "string" ? body.error : "Could not confirm this campaign. Please try again.",
         );
+        setSubmitting(false);
         return;
       }
 
@@ -59,44 +68,42 @@ export function ReviewStep({
       router.refresh();
     } catch {
       setFormError("Could not reach the server. Please try again.");
-    } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10">
-      <h1 className="mb-1 text-xl font-semibold">{campaignName}</h1>
-      <p className="mb-6 text-sm text-gray-500">Step 5 of 6 — Review Campaign</p>
-
+    <WizardShell
+      campaignId={campaignId}
+      title={campaignName}
+      currentStep={submitting ? "confirm" : "review"}
+      completedSteps={completedSteps}
+    >
       <div className="flex flex-col gap-6">
-        <section className="rounded border border-gray-200 p-4">
-          <p className="mb-2 text-sm font-medium">Campaign Basics</p>
+        <Card title="Campaign Basics">
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-            <dt className="text-gray-500">Campaign Name</dt>
+            <dt className="text-muted">Campaign Name</dt>
             <dd>{campaignName}</dd>
-            <dt className="text-gray-500">Product / Promotion</dt>
+            <dt className="text-muted">Product / Promotion</dt>
             <dd>{productPromotion}</dd>
-            <dt className="text-gray-500">Official Pricing</dt>
+            <dt className="text-muted">Official Pricing</dt>
             <dd>
               {officialPricing.amount ?? "—"} {officialPricing.currency ?? ""}
               {officialPricing.terms ? ` · ${officialPricing.terms}` : ""}
             </dd>
           </dl>
-        </section>
+        </Card>
 
-        <section className="rounded border border-gray-200 p-4">
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-sm font-medium">Differentiators</p>
-            <Link
-              href={`/campaigns/${campaignId}/differentiators`}
-              className="text-sm text-gray-500 hover:underline"
-            >
+        <Card
+          title="Differentiators"
+          action={
+            <Link href={`/campaigns/${campaignId}/differentiators`} className="text-sm text-muted hover:underline">
               Edit
             </Link>
-          </div>
+          }
+        >
           {differentiators.length === 0 ? (
-            <p className="text-sm text-gray-500">None added.</p>
+            <p className="text-sm text-muted">None added.</p>
           ) : (
             <ul className="list-inside list-disc text-sm">
               {differentiators.map((d, i) => (
@@ -104,56 +111,47 @@ export function ReviewStep({
               ))}
             </ul>
           )}
-        </section>
+        </Card>
 
-        <section className="rounded border border-gray-200 p-4">
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-sm font-medium">Selected Dataset(s) ({datasetNames.length})</p>
-            <Link
-              href={`/campaigns/${campaignId}/datasets`}
-              className="text-sm text-gray-500 hover:underline"
-            >
+        <Card
+          title={`Selected Dataset(s) (${datasetNames.length})`}
+          action={
+            <Link href={`/campaigns/${campaignId}/datasets`} className="text-sm text-muted hover:underline">
               Edit
             </Link>
-          </div>
+          }
+        >
           {datasetNames.length === 0 ? (
-            <p className="text-sm text-gray-500">None selected.</p>
+            <p className="text-sm text-muted">None selected.</p>
           ) : (
             <ul className="flex flex-wrap gap-2">
               {datasetNames.map((name) => (
-                <li
-                  key={name}
-                  className="rounded-full bg-gray-900 px-3 py-1 text-xs font-medium text-white"
-                >
-                  {name}
+                <li key={name}>
+                  <Badge>{name}</Badge>
                 </li>
               ))}
             </ul>
           )}
-        </section>
+        </Card>
 
-        <section className="rounded border border-gray-200 p-4">
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-sm font-medium">
-              Selected Buildings ({totalBuildingCount})
-            </p>
-            <Link
-              href={`/campaigns/${campaignId}/buildings`}
-              className="text-sm text-gray-500 hover:underline"
-            >
+        <Card
+          title={`Selected Buildings (${totalBuildingCount})`}
+          action={
+            <Link href={`/campaigns/${campaignId}/buildings`} className="text-sm text-muted hover:underline">
               Edit
             </Link>
-          </div>
+          }
+        >
           {buildingGroups.length === 0 ? (
-            <p className="text-sm text-gray-500">None selected.</p>
+            <p className="text-sm text-muted">None selected.</p>
           ) : (
             <div className="flex flex-col gap-4">
               {buildingGroups.map((group) => (
                 <div key={group.datasetId}>
-                  <p className="mb-1 text-sm font-medium text-gray-700">
+                  <p className="mb-1 text-sm font-medium text-foreground">
                     {group.datasetName} ({group.buildingNames.length})
                   </p>
-                  <ul className="list-inside list-disc text-sm text-gray-600">
+                  <ul className="list-inside list-disc text-sm text-muted">
                     {group.buildingNames.map((name, i) => (
                       <li key={i}>{name}</li>
                     ))}
@@ -162,27 +160,25 @@ export function ReviewStep({
               ))}
             </div>
           )}
-        </section>
+        </Card>
       </div>
 
-      {formError && <p className="mt-4 text-sm text-red-600">{formError}</p>}
+      {formError && (
+        <div className="mt-4">
+          <ErrorState message={formError} />
+        </div>
+      )}
 
       <div className="mt-6 flex items-center gap-3">
-        <Link
-          href={`/campaigns/${campaignId}/buildings`}
-          className="rounded border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
-        >
-          Back
+        <Link href={`/campaigns/${campaignId}/buildings`}>
+          <Button type="button" variant="secondary" disabled={submitting}>
+            Back
+          </Button>
         </Link>
-        <button
-          type="button"
-          onClick={handleConfirm}
-          disabled={submitting}
-          className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
+        <Button type="button" onClick={handleConfirm} isLoading={submitting}>
           {submitting ? "Confirming…" : "Confirm Campaign"}
-        </button>
+        </Button>
       </div>
-    </div>
+    </WizardShell>
   );
 }

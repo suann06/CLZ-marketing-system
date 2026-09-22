@@ -2,15 +2,23 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { WizardShell } from "@/components/campaign/wizard/wizard-shell";
+import type { WizardStepKey } from "@/components/campaign/wizard/wizard-steps";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { ErrorState } from "@/components/ui/error-state";
 
 export function DifferentiatorsStep({
   campaignId,
   campaignName,
   initialDifferentiators,
+  completedSteps,
 }: {
   campaignId: string;
   campaignName: string;
   initialDifferentiators: string[];
+  completedSteps: WizardStepKey[];
 }) {
   const router = useRouter();
 
@@ -75,54 +83,43 @@ export function DifferentiatorsStep({
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10">
-      <h1 className="mb-1 text-xl font-semibold">{campaignName}</h1>
-      <p className="mb-6 text-sm text-gray-500">Step 2 of 6 — Differentiators</p>
-      <p className="mb-6 text-sm text-gray-600">
+    <WizardShell campaignId={campaignId} title={campaignName} currentStep="differentiators" completedSteps={completedSteps}>
+      <p className="mb-6 text-sm text-muted">
         Add CLZ-specific differentiators for this campaign — angles and advantages beyond the
-        official pricing and promotion facts entered in Step 1.
+        official pricing and promotion facts entered in Basics.
       </p>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2">
-          {differentiators.map((value, index) => (
-            <div key={index} className="flex gap-2">
-              <input
-                value={value}
-                onChange={(e) => updateAt(index, e.target.value)}
-                placeholder="e.g. Free installation within 3 working days"
-                className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
-              />
-              <button
-                type="button"
-                onClick={() => removeAt(index)}
-                aria-label="Remove differentiator"
-                className="rounded border border-gray-300 px-3 py-2 text-sm text-gray-500 hover:bg-gray-50"
-              >
-                ×
-              </button>
-            </div>
-          ))}
+        <Card title="Differentiators">
+          <div className="flex flex-col gap-2">
+            {differentiators.map((value, index) => (
+              <div key={index} className="flex gap-2">
+                <Input
+                  value={value}
+                  onChange={(e) => updateAt(index, e.target.value)}
+                  placeholder="e.g. Free installation within 3 working days"
+                  className="flex-1"
+                />
+                <Button type="button" variant="secondary" onClick={() => removeAt(index)} aria-label="Remove differentiator">
+                  ×
+                </Button>
+              </div>
+            ))}
+          </div>
+
+          <Button type="button" variant="secondary" size="sm" className="mt-3" onClick={addRow}>
+            + Add differentiator
+          </Button>
+        </Card>
+
+        {formError && <ErrorState message={formError} />}
+
+        <div>
+          <Button type="submit" isLoading={submitting}>
+            {submitting ? "Saving…" : "Continue"}
+          </Button>
         </div>
-
-        <button
-          type="button"
-          onClick={addRow}
-          className="self-start rounded border border-gray-300 px-3 py-2 text-sm font-medium hover:bg-gray-50"
-        >
-          + Add differentiator
-        </button>
-
-        {formError && <p className="text-sm text-red-600">{formError}</p>}
-
-        <button
-          type="submit"
-          disabled={submitting}
-          className="mt-2 self-start rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {submitting ? "Saving…" : "Continue"}
-        </button>
       </form>
-    </div>
+    </WizardShell>
   );
 }

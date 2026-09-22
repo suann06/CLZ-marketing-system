@@ -10,16 +10,14 @@ import {
   MarketingStrategyNotFoundError,
 } from "@/server/services/marketing-strategy-service";
 import { GenerateStrategyButton } from "@/components/campaign/strategy/generate-strategy-button";
-import { PageContainer } from "@/components/layout/page-container";
-import { Card } from "@/components/ui/card";
 
 export const dynamic = "force-dynamic";
 
 // Redesigned from "Campaign Brief" into "Overview" for the Campaign
-// Workspace (Phase 4B) — same getCampaignBrief() data and the same
-// GenerateStrategyButton behavior, only the presentation changed. Campaign
-// name/status now live in the persistent workspace header, so this page no
-// longer repeats them.
+// Workspace (Phase 4B), then again for Phase 5's visual identity — same
+// getCampaignBrief() data throughout, only the presentation changed. Read-
+// only info blocks are section headings + dividers, not five stacked
+// Cards — a Card here would represent nothing genuinely separate.
 export default async function CampaignOverviewPage({
   params,
 }: {
@@ -61,94 +59,61 @@ export default async function CampaignOverviewPage({
   }
 
   return (
-    <PageContainer maxWidth="max-w-3xl">
-      <h2 className="mb-6 text-lg font-semibold">Overview</h2>
+    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:px-8">
+      <h2 className="mb-8 text-lg font-semibold text-foreground">Overview</h2>
 
-      <div className="flex flex-col gap-6">
-        <Card title="Product / Pricing / Promotion">
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-            <dt className="text-muted">Product / Promotion</dt>
-            <dd>{brief.productPromotion}</dd>
-            <dt className="text-muted">Official Pricing</dt>
-            <dd>
+      <div className="flex flex-col divide-y divide-border">
+        <section className="pb-8">
+          <h3 className="mb-3 text-sm font-semibold text-foreground">Product, pricing &amp; promotion</h3>
+          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
+            <dt className="text-secondary">Product / promotion</dt>
+            <dd className="text-foreground">{brief.productPromotion}</dd>
+            <dt className="text-secondary">Official pricing</dt>
+            <dd className="text-foreground">
               {officialPricing.amount ?? "—"} {officialPricing.currency ?? ""}
               {officialPricing.terms ? ` · ${officialPricing.terms}` : ""}
             </dd>
           </dl>
-        </Card>
+        </section>
 
-        <Card title="Differentiators">
+        <section className="py-8">
+          <h3 className="mb-3 text-sm font-semibold text-foreground">Differentiators</h3>
           {differentiators.length === 0 ? (
             <p className="text-sm text-muted">None.</p>
           ) : (
-            <ul className="list-inside list-disc text-sm">
+            <ul className="list-inside list-disc text-sm text-secondary">
               {differentiators.map((d, i) => (
                 <li key={i}>{d}</li>
               ))}
             </ul>
           )}
-        </Card>
+        </section>
 
-        <Card title={`Selected Dataset(s) (${brief.datasets.length})`}>
-          <ul className="divide-y divide-border">
-            {brief.datasets.map((d) => (
-              <li key={d.datasetId} className="py-2 text-sm">
-                <span className="font-medium">{d.name}</span>
-                <span className="ml-2 text-muted">
-                  {d.sourceFilename} · {d.rowCount} total rows · {d.selectedBuildingCount} selected
-                </span>
-              </li>
-            ))}
-          </ul>
-        </Card>
+        <section className="py-8">
+          <h3 className="mb-3 text-sm font-semibold text-foreground">Targeting</h3>
+          <p className="text-sm text-secondary">
+            {brief.datasets.length} dataset{brief.datasets.length === 1 ? "" : "s"} ·{" "}
+            {brief.targetingAnalysis.totalSelectedBuildings} building(s) selected. See{" "}
+            <Link href={`/campaigns/${campaignId}/targeting`} className="text-primary hover:underline">
+              Targeting &amp; Buildings
+            </Link>{" "}
+            for the full breakdown.
+          </p>
+        </section>
 
-        <Card
-          title={`Targeting Summary — ${brief.targetingAnalysis.totalSelectedBuildings} building(s) selected across ${brief.targetingAnalysis.datasetCount} dataset(s)`}
-        >
-          <div className="flex flex-col gap-4">
-            {brief.targetingAnalysis.byDataset.map((d) => (
-              <div key={d.datasetId} className="rounded border border-border p-3">
-                <p className="mb-1 text-sm font-medium text-foreground">
-                  {d.datasetName} — {d.buildingCount} building(s)
-                </p>
-                <p className="text-sm text-muted">
-                  {d.buildingsWithAddress} with an address · {d.buildingsWithCoordinates} with
-                  coordinates
-                </p>
-                {d.availableAttributeKeys.length > 0 && (
-                  <p className="mt-1 text-sm text-muted">
-                    Available attributes: {d.availableAttributeKeys.join(", ")}
-                  </p>
-                )}
-                {Object.entries(d.categoricalBreakdowns).map(([key, counts]) => (
-                  <div key={key} className="mt-2 text-sm">
-                    <p className="font-medium text-foreground">{key}</p>
-                    <ul className="list-inside list-disc text-muted">
-                      {Object.entries(counts).map(([value, count]) => (
-                        <li key={value}>
-                          {value}: {count}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        <Card title="Marketing Strategy">
+        <section className="pt-8">
+          <h3 className="mb-3 text-sm font-semibold text-foreground">Marketing strategy</h3>
           {existingStrategy && (
-            <p className="mb-3 text-sm text-muted">
+            <p className="mb-3 text-sm text-secondary">
               Current strategy:{" "}
-              <Link href={`/campaigns/${campaignId}/strategy`} className="underline">
+              <Link href={`/campaigns/${campaignId}/strategy`} className="text-primary hover:underline">
                 version {existingStrategy.version} ({existingStrategy.status})
               </Link>
             </p>
           )}
           <GenerateStrategyButton campaignId={campaignId} />
-        </Card>
+        </section>
       </div>
-    </PageContainer>
+    </div>
   );
 }

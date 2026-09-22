@@ -1,31 +1,43 @@
+import Link from "next/link";
 import {
   compareCampaigns,
   compareDatasets,
   compareCreatives,
   getFeedbackSummaryWithExplanation,
 } from "@/server/services/feedback-service";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export const dynamic = "force-dynamic";
 
-// Minimal, read-only Stage 11 reporting page — no business logic and no
-// direct Prisma access here; every number comes from feedback-service.ts,
-// called directly (same convention as every other server-rendered staff
-// page), not via an internal fetch to the API route. `explanation` is an
-// optional AI-phrased summary of numbers already computed above it — see
-// feedback-service.ts's getFeedbackSummaryWithExplanation().
+// Learning/advisory page ("what patterns can we learn from campaign
+// results") — distinct from Performance (analytical funnel/conversion
+// detail) and Dashboard (operational). No business logic and no direct
+// Prisma access here; every number comes from feedback-service.ts, called
+// directly (same convention as every other server-rendered staff page).
+// `explanation` is an optional AI-phrased summary of numbers already
+// computed above it — see feedback-service.ts's
+// getFeedbackSummaryWithExplanation(). Its wording is validated against
+// causal-language guardrails before it ever reaches this page (see
+// ai-feedback-explanation-schema.ts) — this page renders it verbatim and
+// never rephrases or supplements it with its own generated text.
 function formatRate(rate: number): string {
   return `${(rate * 100).toFixed(1)}%`;
 }
 
-function Highlight({ label, highlight }: { label: string; highlight: { id: string; value: number | string } | null }) {
+function Signal({ label, highlight }: { label: string; highlight: { id: string; value: number | string } | null }) {
   return (
     <div>
-      <p className="text-gray-500">{label}</p>
-      <p className="font-medium">
-        {highlight
-          ? `${highlight.id} (${typeof highlight.value === "number" ? formatRate(highlight.value) : highlight.value})`
-          : "Not enough recorded data yet"}
-      </p>
+      <p className="text-xs text-muted">{label}</p>
+      {highlight ? (
+        <>
+          <p className="mt-1 font-mono text-xl font-semibold tabular-nums text-foreground">
+            {typeof highlight.value === "number" ? formatRate(highlight.value) : highlight.value}
+          </p>
+          <p className="mt-0.5 truncate text-xs text-secondary">{highlight.id}</p>
+        </>
+      ) : (
+        <p className="mt-1 text-sm text-muted">Not enough recorded data yet</p>
+      )}
     </div>
   );
 }
@@ -38,145 +50,191 @@ export default async function FeedbackPage() {
     getFeedbackSummaryWithExplanation(),
   ]);
 
+  // Display-only name resolution — compareCreatives() only carries
+  // campaignId (a Launch/ContentSet always belongs to exactly one
+  // Campaign, but is compared system-wide across all of them, see
+  // feedback-service.ts's own comment on compareCreatives()). Reuses the
+  // campaign list already fetched above for the Campaign Comparison
+  // section instead of a second query.
+  const campaignNameById = new Map(campaigns.campaigns.map((c) => [c.campaignId, c.campaignName]));
+
   return (
-    <div className="mx-auto max-w-4xl px-4 py-10">
-      <h1 className="mb-1 text-xl font-semibold">Feedback / Data Loop</h1>
-      <p className="mb-6 text-sm text-gray-500">
-        Advisory, data-driven comparison — nothing here automatically changes any Campaign, dataset, or
-        content. All figures are correlational observations, not causal claims.
+    <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8">
+      <h1 className="text-[1.75rem] font-semibold tracking-tight text-foreground">Feedback</h1>
+      <p className="mt-1.5 mb-10 max-w-2xl text-sm text-secondary">
+        Advisory, data-driven comparison — nothing here automatically changes any campaign, targeting,
+        strategy, content, or launch configuration. Every figure is a correlational observation based on
+        recorded campaign outcomes, not a causal claim.
       </p>
 
-      <section className="mb-8 rounded border border-gray-200 p-4">
-        <p className="mb-3 text-sm font-medium">Highest / Lowest Observed Signals</p>
-        <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-          <Highlight label="Highest campaign win rate" highlight={campaigns.highestObservedWinRate} />
-          <Highlight label="Lowest campaign win rate" highlight={campaigns.lowestObservedWinRate} />
-          <Highlight
-            label="Highest campaign sales value"
+      <div className="mb-12">
+        <h2 className="mb-5 text-lg font-semibold text-foreground">Highest / lowest observed signals</h2>
+        <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
+          <Signal label="Highest observed campaign win rate" highlight={campaigns.highestObservedWinRate} />
+          <Signal label="Lowest observed campaign win rate" highlight={campaigns.lowestObservedWinRate} />
+          <Signal
+            label="Highest observed campaign sales value"
             highlight={
               campaigns.highestObservedSalesValue
                 ? { id: campaigns.highestObservedSalesValue.id, value: `RM ${campaigns.highestObservedSalesValue.value}` }
                 : null
             }
           />
-          <Highlight label="Highest dataset win rate" highlight={datasets.highestObservedWinRate} />
+          <Signal label="Highest observed dataset win rate" highlight={datasets.highestObservedWinRate} />
         </div>
 
         {summary.explanation && (
-          <div className="mt-4 rounded border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">
-            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-blue-600">
-              AI-assisted advisory summary (simulated/stub — not a real AI call)
+          <div className="mt-6 rounded-r-[14px] border-l-2 border-primary bg-accent-subtle p-4 text-sm text-accent-ink">
+            <p className="mb-1.5 text-xs font-medium text-accent-ink/70">
+              Advisory summary — AI-phrased from the numbers above (simulated/stub, not a real AI call)
             </p>
             <p>{summary.explanation.summary}</p>
+            {summary.explanation.highlights.length > 0 && (
+              <ul className="mt-2 list-inside list-disc">
+                {summary.explanation.highlights.map((h, i) => (
+                  <li key={i}>{h}</li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
-      </section>
+      </div>
 
-      <section className="mb-8 rounded border border-gray-200 p-4">
-        <p className="mb-3 text-sm font-medium">Campaign Comparison ({campaigns.campaigns.length})</p>
+      <div className="mb-12">
+        <h2 className="mb-4 text-lg font-semibold text-foreground">Campaign comparison ({campaigns.campaigns.length})</h2>
         {campaigns.campaigns.length === 0 ? (
-          <p className="text-sm text-gray-500">No campaigns yet.</p>
+          <EmptyState title="No campaigns yet" />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-wide text-gray-500">
+            <table className="w-full min-w-[640px] text-sm">
+              <thead className="text-left text-xs text-muted">
                 <tr>
-                  <th className="py-2 pr-4">Campaign</th>
-                  <th className="py-2 pr-4">Clicks</th>
-                  <th className="py-2 pr-4">Won / Lost</th>
-                  <th className="py-2 pr-4">Win Rate</th>
-                  <th className="py-2 pr-4">Sales Value</th>
+                  <th className="border-b border-border py-2.5 pr-4 font-medium">Campaign</th>
+                  <th className="border-b border-border py-2.5 pr-4 text-right font-medium">Clicks</th>
+                  <th className="border-b border-border py-2.5 pr-4 text-right font-medium">Won / Lost</th>
+                  <th className="border-b border-border py-2.5 pr-4 text-right font-medium">Win rate</th>
+                  <th className="border-b border-border py-2.5 pr-0 text-right font-medium">Sales value</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody>
                 {campaigns.campaigns.map((c) => (
-                  <tr key={c.campaignId}>
-                    <td className="py-2 pr-4 font-medium">{c.campaignName}</td>
-                    <td className="py-2 pr-4">{c.totalClicks}</td>
-                    <td className="py-2 pr-4">
+                  <tr key={c.campaignId} className="transition-colors duration-150 hover:bg-surface-raised">
+                    <td className="border-b border-border py-3 pr-4 font-medium text-foreground">
+                      <Link href={`/campaigns/${c.campaignId}/performance`} className="hover:underline">
+                        {c.campaignName}
+                      </Link>
+                    </td>
+                    <td className="border-b border-border py-3 pr-4 text-right font-mono tabular-nums text-foreground">
+                      {c.totalClicks}
+                    </td>
+                    <td className="border-b border-border py-3 pr-4 text-right font-mono tabular-nums text-foreground">
                       {c.wonSales} / {c.lostSales}
                     </td>
-                    <td className="py-2 pr-4">{formatRate(c.winRate)}</td>
-                    <td className="py-2 pr-4">RM {c.totalSalesValue}</td>
+                    <td className="border-b border-border py-3 pr-4 text-right font-mono tabular-nums text-foreground">
+                      {formatRate(c.winRate)}
+                    </td>
+                    <td className="border-b border-border py-3 pr-0 text-right font-mono tabular-nums text-foreground">
+                      RM {c.totalSalesValue}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
-      </section>
+      </div>
 
-      <section className="mb-8 rounded border border-gray-200 p-4">
-        <p className="mb-3 text-sm font-medium">Dataset Comparison ({datasets.datasets.length})</p>
+      <div className="mb-12">
+        <h2 className="mb-4 text-lg font-semibold text-foreground">Dataset comparison ({datasets.datasets.length})</h2>
         {datasets.datasets.length === 0 ? (
-          <p className="text-sm text-gray-500">No datasets yet.</p>
+          <EmptyState title="No datasets yet" />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-wide text-gray-500">
+            <table className="w-full min-w-[640px] text-sm">
+              <thead className="text-left text-xs text-muted">
                 <tr>
-                  <th className="py-2 pr-4">Dataset</th>
-                  <th className="py-2 pr-4">Clicks</th>
-                  <th className="py-2 pr-4">Won / Lost</th>
-                  <th className="py-2 pr-4">Win Rate</th>
-                  <th className="py-2 pr-4">Sales Value</th>
+                  <th className="border-b border-border py-2.5 pr-4 font-medium">Dataset</th>
+                  <th className="border-b border-border py-2.5 pr-4 text-right font-medium">Clicks</th>
+                  <th className="border-b border-border py-2.5 pr-4 text-right font-medium">Won / Lost</th>
+                  <th className="border-b border-border py-2.5 pr-4 text-right font-medium">Win rate</th>
+                  <th className="border-b border-border py-2.5 pr-0 text-right font-medium">Sales value</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody>
                 {datasets.datasets.map((d) => (
-                  <tr key={d.datasetId}>
-                    <td className="py-2 pr-4 font-medium">{d.datasetName}</td>
-                    <td className="py-2 pr-4">{d.totalClicks}</td>
-                    <td className="py-2 pr-4">
+                  <tr key={d.datasetId} className="transition-colors duration-150 hover:bg-surface-raised">
+                    <td className="border-b border-border py-3 pr-4 font-medium text-foreground">{d.datasetName}</td>
+                    <td className="border-b border-border py-3 pr-4 text-right font-mono tabular-nums text-foreground">
+                      {d.totalClicks}
+                    </td>
+                    <td className="border-b border-border py-3 pr-4 text-right font-mono tabular-nums text-foreground">
                       {d.wonSales} / {d.lostSales}
                     </td>
-                    <td className="py-2 pr-4">{formatRate(d.winRate)}</td>
-                    <td className="py-2 pr-4">RM {d.totalSalesValue}</td>
+                    <td className="border-b border-border py-3 pr-4 text-right font-mono tabular-nums text-foreground">
+                      {formatRate(d.winRate)}
+                    </td>
+                    <td className="border-b border-border py-3 pr-0 text-right font-mono tabular-nums text-foreground">
+                      RM {d.totalSalesValue}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
-      </section>
+      </div>
 
-      <section className="rounded border border-gray-200 p-4">
-        <p className="mb-3 text-sm font-medium">Creative Comparison ({creatives.creatives.length})</p>
+      <div>
+        <h2 className="mb-4 text-lg font-semibold text-foreground">Creative comparison ({creatives.creatives.length})</h2>
         {creatives.creatives.length === 0 ? (
-          <p className="text-sm text-gray-500">No launches yet.</p>
+          <EmptyState title="No launches yet" />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-wide text-gray-500">
+            <table className="w-full min-w-[640px] text-sm">
+              <thead className="text-left text-xs text-muted">
                 <tr>
-                  <th className="py-2 pr-4">Campaign</th>
-                  <th className="py-2 pr-4">Platform</th>
-                  <th className="py-2 pr-4">Content Set</th>
-                  <th className="py-2 pr-4">Variant</th>
-                  <th className="py-2 pr-4">Won / Lost</th>
-                  <th className="py-2 pr-4">Win Rate</th>
-                  <th className="py-2 pr-4">Sales Value</th>
+                  <th className="border-b border-border py-2.5 pr-4 font-medium">Campaign</th>
+                  <th className="border-b border-border py-2.5 pr-4 font-medium">Platform</th>
+                  <th className="border-b border-border py-2.5 pr-4 font-medium">Variant</th>
+                  <th className="border-b border-border py-2.5 pr-4 text-right font-medium">Won / Lost</th>
+                  <th className="border-b border-border py-2.5 pr-4 text-right font-medium">Win rate</th>
+                  <th className="border-b border-border py-2.5 pr-0 text-right font-medium">Sales value</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody>
                 {creatives.creatives.map((c) => (
-                  <tr key={`${c.campaignId}-${c.contentSetId}-${c.contentSetVersion}-${c.platform}-${c.variantIndex}`}>
-                    <td className="py-2 pr-4">{c.campaignId}</td>
-                    <td className="py-2 pr-4 capitalize">{c.platform}</td>
-                    <td className="py-2 pr-4">v{c.contentSetVersion}</td>
-                    <td className="py-2 pr-4">#{c.variantIndex}</td>
-                    <td className="py-2 pr-4">
+                  <tr
+                    key={`${c.campaignId}-${c.contentSetId}-${c.contentSetVersion}-${c.platform}-${c.variantIndex}`}
+                    className="transition-colors duration-150 hover:bg-surface-raised"
+                  >
+                    <td className="border-b border-border py-3 pr-4">
+                      <Link
+                        href={`/campaigns/${c.campaignId}/performance`}
+                        className="font-medium text-foreground hover:underline"
+                      >
+                        {campaignNameById.get(c.campaignId) ?? c.campaignId}
+                      </Link>
+                    </td>
+                    <td className="border-b border-border py-3 pr-4 text-secondary capitalize">{c.platform}</td>
+                    <td className="border-b border-border py-3 pr-4 text-secondary">
+                      v{c.contentSetVersion} #{c.variantIndex}
+                    </td>
+                    <td className="border-b border-border py-3 pr-4 text-right font-mono tabular-nums text-foreground">
                       {c.wonSales} / {c.lostSales}
                     </td>
-                    <td className="py-2 pr-4">{formatRate(c.winRate)}</td>
-                    <td className="py-2 pr-4">RM {c.totalSalesValue}</td>
+                    <td className="border-b border-border py-3 pr-4 text-right font-mono tabular-nums text-foreground">
+                      {formatRate(c.winRate)}
+                    </td>
+                    <td className="border-b border-border py-3 pr-0 text-right font-mono tabular-nums text-foreground">
+                      RM {c.totalSalesValue}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
-      </section>
+      </div>
     </div>
   );
 }

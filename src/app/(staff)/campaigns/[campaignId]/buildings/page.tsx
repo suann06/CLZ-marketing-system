@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { getCampaignDetail, CampaignNotFoundError } from "@/server/services/campaign-service";
 import { getDatasetWithBuildings } from "@/server/services/dataset-service";
 import { BuildingSelectStep } from "@/components/campaign/wizard/building-select-step";
+import { computeCompletedSteps } from "@/components/campaign/wizard/wizard-steps";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,7 @@ export default async function CampaignBuildingsPage({
       campaignName={detail.campaign.name}
       datasetGroups={datasetGroups}
       initialSelectedBuildingIds={initialSelectedBuildingIds}
+      completedSteps={computeCompletedSteps(detail)}
     />
   );
 }

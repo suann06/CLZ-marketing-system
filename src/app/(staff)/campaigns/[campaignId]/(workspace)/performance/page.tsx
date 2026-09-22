@@ -1,23 +1,32 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCampaignDetail, CampaignNotFoundError } from "@/server/services/campaign-service";
+import { CampaignNotFoundError } from "@/server/services/campaign-service";
 import {
   getCampaignPerformance,
   getDatasetPerformance,
   getCreativePerformance,
+  getSalesTimeSeries,
 } from "@/server/services/campaign-performance-service";
+import { Button } from "@/components/ui/button";
+import { MetricBand } from "@/components/ui/metric-band";
+import { FunnelChart } from "@/components/ui/funnel-chart";
+import { ConversionAnalysis } from "@/components/performance/conversion-analysis";
+import { DatasetComparison } from "@/components/performance/dataset-comparison";
+import { CreativeComparison } from "@/components/performance/creative-comparison";
+import { SalesTimeSeries } from "@/components/performance/sales-time-series";
 
 export const dynamic = "force-dynamic";
 
-// Minimal, read-only reporting page — no business logic and no direct
-// Prisma access here; every number comes from campaign-performance-service.ts
-// (Stage 10), called directly the same way every other server-rendered
-// staff page in this app calls its service layer (e.g. campaigns/page.tsx
-// -> listCampaigns()), not via an internal fetch to the API route.
-function formatRate(rate: number): string {
-  return `${(rate * 100).toFixed(1)}%`;
-}
-
+// Analytical workspace ("how did this campaign perform, and where does
+// the funnel lose volume") — distinct in purpose from the Dashboard
+// (operational) and Feedback (learning/advisory) pages it links to/from.
+// No business logic and no direct Prisma access here; every number comes
+// from campaign-performance-service.ts, called directly the same way
+// every other server-rendered staff page calls its service layer. The
+// campaign name/status/dates header already comes from the (workspace)
+// layout, so this page doesn't repeat it. No section is wrapped in a
+// bordered Card — a heading is enough; this should read as one analytical
+// document, not a stack of dashboard modules.
 export default async function CampaignPerformancePage({
   params,
 }: {
@@ -25,9 +34,9 @@ export default async function CampaignPerformancePage({
 }) {
   const { campaignId } = await params;
 
-  let detail;
+  let performance;
   try {
-    detail = await getCampaignDetail(campaignId);
+    performance = await getCampaignPerformance(campaignId);
   } catch (err) {
     if (err instanceof CampaignNotFoundError) {
       notFound();
@@ -35,176 +44,90 @@ export default async function CampaignPerformancePage({
     throw err;
   }
 
-  const [performance, datasets, creatives] = await Promise.all([
-    getCampaignPerformance(campaignId),
+  const [datasets, creatives, salesTimeSeries] = await Promise.all([
     getDatasetPerformance(campaignId),
     getCreativePerformance(campaignId),
+    getSalesTimeSeries(campaignId),
   ]);
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-10">
-      <h1 className="mb-1 text-xl font-semibold">Campaign Performance</h1>
-      <p className="mb-1 text-sm text-gray-500">{detail.campaign.name}</p>
-      <p className="mb-6 text-sm">
-        <Link href={`/campaigns/${campaignId}/leads`} className="underline">
-          ← Back to Leads
-        </Link>{" "}
-        ·{" "}
-        <Link href="/feedback" className="underline">
-          View Feedback →
-        </Link>
-      </p>
-
-      {/* A. Campaign funnel + conversion rates + sales value */}
-      <section className="mb-8 rounded border border-gray-200 p-4">
-        <p className="mb-3 text-sm font-medium">Funnel</p>
-        <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-          <div>
-            <p className="text-gray-500">Ads</p>
-            <p className="text-lg font-semibold">{performance.totalAds}</p>
-          </div>
-          <div>
-            <p className="text-gray-500">Clicks</p>
-            <p className="text-lg font-semibold">{performance.totalClicks}</p>
-          </div>
-          <div>
-            <p className="text-gray-500">WhatsApp Enquiries</p>
-            <p className="text-lg font-semibold">{performance.totalWhatsAppEnquiries}</p>
-          </div>
-          <div>
-            <p className="text-gray-500">Applications</p>
-            <p className="text-lg font-semibold">{performance.totalApplications}</p>
-          </div>
-          <div>
-            <p className="text-gray-500">Qualified Leads</p>
-            <p className="text-lg font-semibold">{performance.totalQualifiedLeads}</p>
-          </div>
-          <div>
-            <p className="text-gray-500">Won / Lost Sales</p>
-            <p className="text-lg font-semibold">
-              {performance.wonSales} / {performance.lostSales}
-            </p>
-          </div>
-          <div>
-            <p className="text-gray-500">Win Rate</p>
-            <p className="text-lg font-semibold">{formatRate(performance.winRate)}</p>
-          </div>
-          <div>
-            <p className="text-gray-500">Total Sales Value (Won)</p>
-            <p className="text-lg font-semibold">RM {performance.totalSalesValue}</p>
-          </div>
+    <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-semibold text-foreground">Performance</h2>
+          <p className="mt-1 text-sm text-secondary">Analytical view of this campaign&apos;s funnel and outcomes.</p>
         </div>
-
-        <p className="mt-4 mb-2 text-sm font-medium">Conversion Rates</p>
-        <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
-          <div>
-            <p className="text-gray-500">Click → Enquiry</p>
-            <p className="font-medium">{formatRate(performance.conversionRates.clickToEnquiryRate)}</p>
-          </div>
-          <div>
-            <p className="text-gray-500">Enquiry → Application</p>
-            <p className="font-medium">{formatRate(performance.conversionRates.enquiryToApplicationRate)}</p>
-          </div>
-          <div>
-            <p className="text-gray-500">Application → Qualified</p>
-            <p className="font-medium">{formatRate(performance.conversionRates.applicationToQualifiedRate)}</p>
-          </div>
-          <div>
-            <p className="text-gray-500">Qualified → Sale</p>
-            <p className="font-medium">{formatRate(performance.conversionRates.qualifiedToSaleRate)}</p>
-          </div>
-          <div>
-            <p className="text-gray-500">Overall Click → Sale</p>
-            <p className="font-medium">{formatRate(performance.conversionRates.overallClickToSaleRate)}</p>
-          </div>
+        <div className="flex items-center gap-3">
+          <Link href={`/campaigns/${campaignId}/leads`}>
+            <Button type="button" variant="secondary">
+              ← Back to Leads
+            </Button>
+          </Link>
+          <Link href="/feedback">
+            <Button type="button" variant="secondary">
+              View Feedback →
+            </Button>
+          </Link>
         </div>
-        <p className="mt-3 text-xs text-gray-400">
-          No click-through rate is shown — this system does not capture ad-impression/reach data, only
-          clicks, so a CTR cannot be reliably calculated.
-        </p>
-      </section>
+      </div>
 
-      {/* B. Dataset performance */}
-      <section className="mb-8 rounded border border-gray-200 p-4">
-        <p className="mb-3 text-sm font-medium">Dataset Performance ({datasets.length})</p>
-        {datasets.length === 0 ? (
-          <p className="text-sm text-gray-500">No dataset-attributed clicks yet.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-wide text-gray-500">
-                <tr>
-                  <th className="py-2 pr-4">Dataset</th>
-                  <th className="py-2 pr-4">Clicks</th>
-                  <th className="py-2 pr-4">Enquiries</th>
-                  <th className="py-2 pr-4">Applications</th>
-                  <th className="py-2 pr-4">Qualified</th>
-                  <th className="py-2 pr-4">Won / Lost</th>
-                  <th className="py-2 pr-4">Sales Value</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {datasets.map((d) => (
-                  <tr key={d.datasetId}>
-                    <td className="py-2 pr-4 font-medium">{d.datasetName}</td>
-                    <td className="py-2 pr-4">{d.totalClicks}</td>
-                    <td className="py-2 pr-4">{d.totalEnquiries}</td>
-                    <td className="py-2 pr-4">{d.totalApplications}</td>
-                    <td className="py-2 pr-4">{d.qualifiedLeads}</td>
-                    <td className="py-2 pr-4">
-                      {d.wonSales} / {d.lostSales}
-                    </td>
-                    <td className="py-2 pr-4">RM {d.totalSalesValue}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+      <MetricBand
+        className="mb-12"
+        items={[
+          { label: "Sales value", value: `RM ${performance.totalSalesValue}`, hero: true },
+          { label: "Clicks", value: String(performance.totalClicks) },
+          { label: "Applications", value: String(performance.totalApplications) },
+          { label: "Won / lost", value: `${performance.wonSales} / ${performance.lostSales}` },
+        ]}
+      />
 
-      {/* C. Creative / content version performance */}
-      <section className="rounded border border-gray-200 p-4">
-        <p className="mb-3 text-sm font-medium">Creative Performance ({creatives.length})</p>
-        {creatives.length === 0 ? (
-          <p className="text-sm text-gray-500">No launches yet.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-wide text-gray-500">
-                <tr>
-                  <th className="py-2 pr-4">Platform</th>
-                  <th className="py-2 pr-4">Content Set</th>
-                  <th className="py-2 pr-4">Variant</th>
-                  <th className="py-2 pr-4">Clicks</th>
-                  <th className="py-2 pr-4">Enquiries</th>
-                  <th className="py-2 pr-4">Applications</th>
-                  <th className="py-2 pr-4">Qualified</th>
-                  <th className="py-2 pr-4">Won / Lost</th>
-                  <th className="py-2 pr-4">Sales Value</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {creatives.map((c) => (
-                  <tr key={`${c.contentSetId}-${c.contentSetVersion}-${c.platform}-${c.variantIndex}`}>
-                    <td className="py-2 pr-4 font-medium capitalize">{c.platform}</td>
-                    <td className="py-2 pr-4">v{c.contentSetVersion}</td>
-                    <td className="py-2 pr-4">#{c.variantIndex}</td>
-                    <td className="py-2 pr-4">{c.clicks}</td>
-                    <td className="py-2 pr-4">{c.enquiries}</td>
-                    <td className="py-2 pr-4">{c.applications}</td>
-                    <td className="py-2 pr-4">{c.qualifiedLeads}</td>
-                    <td className="py-2 pr-4">
-                      {c.wonSales} / {c.lostSales}
-                    </td>
-                    <td className="py-2 pr-4">RM {c.salesValue}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+      <div className="mb-12">
+        <h2 className="mb-5 text-lg font-semibold text-foreground">Marketing funnel</h2>
+        <FunnelChart
+          stages={[
+            { key: "ads", label: "Ads", count: performance.totalAds },
+            { key: "clicks", label: "Clicks", count: performance.totalClicks, rate: null },
+            {
+              key: "enquiries",
+              label: "WhatsApp Enquiries",
+              count: performance.totalWhatsAppEnquiries,
+              rate: performance.conversionRates.clickToEnquiryRate,
+            },
+            {
+              key: "applications",
+              label: "Applications",
+              count: performance.totalApplications,
+              rate: performance.conversionRates.enquiryToApplicationRate,
+            },
+            {
+              key: "qualified",
+              label: "Qualified",
+              count: performance.totalQualifiedLeads,
+              rate: performance.conversionRates.applicationToQualifiedRate,
+            },
+            {
+              key: "sales",
+              label: "Sales",
+              count: performance.totalSales,
+              rate: performance.conversionRates.qualifiedToSaleRate,
+            },
+          ]}
+        />
+      </div>
+
+      <div className="mb-12">
+        <ConversionAnalysis rates={performance.conversionRates} />
+      </div>
+
+      <div className="mb-12">
+        <DatasetComparison datasets={datasets} />
+      </div>
+
+      <div className="mb-12">
+        <CreativeComparison creatives={creatives} />
+      </div>
+
+      <SalesTimeSeries points={salesTimeSeries} />
     </div>
   );
 }

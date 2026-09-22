@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getCampaignDetail, CampaignNotFoundError } from "@/server/services/campaign-service";
 import { listDatasets } from "@/server/services/dataset-service";
 import { DatasetSelectStep } from "@/components/campaign/wizard/dataset-select-step";
+import { computeCompletedSteps } from "@/components/campaign/wizard/wizard-steps";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,7 @@ export default async function CampaignDatasetsPage({
         importedAt: d.importedAt.toISOString(),
       }))}
       initialSelectedIds={selectedIds}
+      completedSteps={computeCompletedSteps(detail)}
     />
   );
 }

@@ -3,6 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { campaignBasicsSchema } from "@/server/validation/campaign-schema";
+import { WizardShell } from "@/components/campaign/wizard/wizard-shell";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { ErrorState } from "@/components/ui/error-state";
 
 type FieldErrors = Partial<Record<"name" | "productPromotion" | "officialPricing" | "startDate" | "endDate", string[]>>;
 
@@ -80,126 +85,83 @@ export function BasicsStep() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10">
-      <h1 className="mb-1 text-xl font-semibold">New Campaign</h1>
-      <p className="mb-6 text-sm text-gray-500">Step 1 of 6 — Campaign Basics</p>
+    <WizardShell campaignId={null} title="Campaign Basics" currentStep="basics" completedSteps={[]}>
+      <form onSubmit={handleSubmit}>
+        <Card className="!p-8">
+          <div className="flex flex-col divide-y divide-border">
+            <div className="flex flex-col gap-5 pb-7">
+              <Input
+                id="name"
+                label="Campaign name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                error={fieldErrors.name?.[0]}
+              />
+              <Input
+                id="productPromotion"
+                label="Product / promotion"
+                value={productPromotion}
+                onChange={(e) => setProductPromotion(e.target.value)}
+                error={fieldErrors.productPromotion?.[0]}
+              />
+            </div>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-        <div className="flex flex-col gap-1">
-          <label htmlFor="name" className="text-sm font-medium">
-            Campaign Name
-          </label>
-          <input
-            id="name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
-          />
-          {fieldErrors.name && <p className="text-sm text-red-600">{fieldErrors.name[0]}</p>}
+            <div className="flex flex-col gap-5 py-7">
+              <h3 className="text-sm font-semibold text-foreground">Official pricing</h3>
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                <Input
+                  id="amount"
+                  label="Amount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                />
+                <Input id="currency" label="Currency" value={currency} onChange={(e) => setCurrency(e.target.value)} />
+              </div>
+              <Input id="terms" label="Terms (optional)" value={terms} onChange={(e) => setTerms(e.target.value)} />
+              {fieldErrors.officialPricing && (
+                <p className="text-sm text-error">{fieldErrors.officialPricing[0]}</p>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-5 pt-7">
+              <h3 className="text-sm font-semibold text-foreground">Schedule</h3>
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                <Input
+                  id="startDate"
+                  label="Start date"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  error={fieldErrors.startDate?.[0]}
+                />
+                <Input
+                  id="endDate"
+                  label="End date"
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  error={fieldErrors.endDate?.[0]}
+                />
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {formError && (
+          <div className="mt-5">
+            <ErrorState message={formError} />
+          </div>
+        )}
+
+        <div className="mt-6">
+          <Button type="submit" isLoading={submitting}>
+            {submitting ? "Saving…" : "Continue"}
+          </Button>
         </div>
-
-        <div className="flex flex-col gap-1">
-          <label htmlFor="productPromotion" className="text-sm font-medium">
-            Product / Promotion
-          </label>
-          <input
-            id="productPromotion"
-            value={productPromotion}
-            onChange={(e) => setProductPromotion(e.target.value)}
-            className="rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
-          />
-          {fieldErrors.productPromotion && (
-            <p className="text-sm text-red-600">{fieldErrors.productPromotion[0]}</p>
-          )}
-        </div>
-
-        <fieldset className="flex flex-col gap-3 rounded border border-gray-200 p-4">
-          <legend className="px-1 text-sm font-medium">Official Pricing</legend>
-
-          <div className="flex flex-col gap-1">
-            <label htmlFor="amount" className="text-sm">
-              Amount
-            </label>
-            <input
-              id="amount"
-              type="number"
-              min="0"
-              step="0.01"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className="rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
-            />
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label htmlFor="currency" className="text-sm">
-              Currency
-            </label>
-            <input
-              id="currency"
-              value={currency}
-              onChange={(e) => setCurrency(e.target.value)}
-              className="rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
-            />
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label htmlFor="terms" className="text-sm">
-              Terms <span className="text-gray-400">(optional)</span>
-            </label>
-            <input
-              id="terms"
-              value={terms}
-              onChange={(e) => setTerms(e.target.value)}
-              className="rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
-            />
-          </div>
-
-          {fieldErrors.officialPricing && (
-            <p className="text-sm text-red-600">{fieldErrors.officialPricing[0]}</p>
-          )}
-        </fieldset>
-
-        <div className="flex gap-4">
-          <div className="flex flex-1 flex-col gap-1">
-            <label htmlFor="startDate" className="text-sm font-medium">
-              Start Date
-            </label>
-            <input
-              id="startDate"
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
-            />
-            {fieldErrors.startDate && <p className="text-sm text-red-600">{fieldErrors.startDate[0]}</p>}
-          </div>
-
-          <div className="flex flex-1 flex-col gap-1">
-            <label htmlFor="endDate" className="text-sm font-medium">
-              End Date
-            </label>
-            <input
-              id="endDate"
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
-            />
-            {fieldErrors.endDate && <p className="text-sm text-red-600">{fieldErrors.endDate[0]}</p>}
-          </div>
-        </div>
-
-        {formError && <p className="text-sm text-red-600">{formError}</p>}
-
-        <button
-          type="submit"
-          disabled={submitting}
-          className="mt-2 self-start rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {submitting ? "Saving…" : "Continue"}
-        </button>
       </form>
-    </div>
+    </WizardShell>
   );
 }

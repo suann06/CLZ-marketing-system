@@ -205,6 +205,52 @@ export async function getDatasetPerformance(campaignId: string): Promise<Dataset
   );
 }
 
+export type SalesTimeSeriesPoint = {
+  date: string; // YYYY-MM-DD, UTC date of Sale.closedAt
+  salesValue: string; // sum of won Sale.saleValue closed on this date, formatted to 2dp
+  count: number; // number of won sales closed on this date
+};
+
+// Phase 4F: day-bucketed won-sale totals for one campaign, ordered
+// chronologically. Bucketed in JS rather than a DB groupBy — Postgres
+// date-truncation isn't reachable through Prisma's query builder without
+// raw SQL, and this campaign's Sale volume is always small enough that
+// fetching every row and bucketing here is simpler and just as correct.
+// Won sales only, matching totalSalesValue elsewhere in this file (lost
+// sales never contribute to revenue). Closed date is the only timestamp
+// that represents when a sale outcome was actually recorded — this is not
+// a "leads over time" or "clicks over time" series.
+export async function getSalesTimeSeries(campaignId: string): Promise<SalesTimeSeriesPoint[]> {
+  const campaign = await prisma.campaign.findUnique({
+    where: { id: campaignId },
+    select: { id: true },
+  });
+  if (!campaign) throw new CampaignNotFoundError(campaignId);
+
+  const sales = await prisma.sale.findMany({
+    where: { campaignId, status: SaleStatus.won },
+    select: { closedAt: true, saleValue: true },
+    orderBy: { closedAt: "asc" },
+  });
+
+  const byDate = new Map<string, { sum: Prisma.Decimal; count: number }>();
+  for (const sale of sales) {
+    const date = sale.closedAt.toISOString().slice(0, 10);
+    const value = sale.saleValue ?? new Prisma.Decimal(0);
+    const existing = byDate.get(date);
+    if (existing) {
+      existing.sum = existing.sum.add(value);
+      existing.count += 1;
+    } else {
+      byDate.set(date, { sum: value, count: 1 });
+    }
+  }
+
+  return [...byDate.entries()]
+    .sort(([a], [b]) => (a < b ? -1 : 1))
+    .map(([date, agg]) => ({ date, salesValue: formatMoney(agg.sum), count: agg.count }));
+}
+
 export type CreativePerformance = {
   campaignId: string;
   contentSetId: string;

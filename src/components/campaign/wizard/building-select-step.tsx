@@ -3,6 +3,14 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { WizardShell } from "@/components/campaign/wizard/wizard-shell";
+import type { WizardStepKey } from "@/components/campaign/wizard/wizard-steps";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
 
 export type BuildingSummary = {
   id: string;
@@ -21,11 +29,13 @@ export function BuildingSelectStep({
   campaignName,
   datasetGroups,
   initialSelectedBuildingIds,
+  completedSteps,
 }: {
   campaignId: string;
   campaignName: string;
   datasetGroups: DatasetGroup[];
   initialSelectedBuildingIds: string[];
+  completedSteps: WizardStepKey[];
 }) {
   const router = useRouter();
 
@@ -60,6 +70,28 @@ export function BuildingSelectStep({
       }))
       .filter((group) => group.buildings.length > 0);
   }, [datasetGroups, query]);
+
+  // Scoped to whatever is currently visible (respects the active search),
+  // so "select all" never silently selects buildings the user has filtered
+  // out of view. Purely client-side Set manipulation — the same selectedIds
+  // state toggleSelected() already uses; no new persistence/selection logic.
+  const visibleIds = useMemo(
+    () => filteredGroups.flatMap((g) => g.buildings.map((b) => b.id)),
+    [filteredGroups],
+  );
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+
+  function selectAllVisible() {
+    setSelectedIds((prev) => new Set([...prev, ...visibleIds]));
+  }
+
+  function deselectAllVisible() {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of visibleIds) next.delete(id);
+      return next;
+    });
+  }
 
   async function handleContinue() {
     setFormError(null);
@@ -103,96 +135,100 @@ export function BuildingSelectStep({
   const totalBuildings = datasetGroups.reduce((sum, g) => sum + g.buildings.length, 0);
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10">
-      <h1 className="mb-1 text-xl font-semibold">{campaignName}</h1>
-      <p className="mb-6 text-sm text-gray-500">Step 4 of 6 — Select Buildings</p>
-
-      <div className="mb-6 rounded border border-gray-200 p-4">
-        <p className="mb-2 text-sm font-medium">
-          Selected datasets ({datasetGroups.length})
-        </p>
+    <WizardShell campaignId={campaignId} title={campaignName} currentStep="buildings" completedSteps={completedSteps}>
+      <Card title={`Selected datasets (${datasetGroups.length})`} className="mb-6">
         <ul className="flex flex-wrap gap-2">
           {datasetGroups.map((g) => (
-            <li
-              key={g.datasetId}
-              className="rounded-full bg-gray-900 px-3 py-1 text-xs font-medium text-white"
-            >
-              {g.datasetName} · {g.buildings.length}
+            <li key={g.datasetId}>
+              <Badge>{g.datasetName} · {g.buildings.length}</Badge>
             </li>
           ))}
         </ul>
-      </div>
+      </Card>
 
-      <div className="mb-4 flex items-center justify-between gap-4">
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by building name…"
-          className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
+      {totalBuildings === 0 ? (
+        <EmptyState
+          title="No buildings in the selected dataset(s)"
+          description="Go back and choose a dataset that has buildings."
         />
-        <p className="whitespace-nowrap text-sm text-gray-600">
-          {selectedIds.size} of {totalBuildings} selected
-        </p>
-      </div>
-
-      {filteredGroups.length === 0 ? (
-        <p className="rounded border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-500">
-          No buildings match your search.
-        </p>
       ) : (
-        <div className="flex flex-col gap-6">
-          {filteredGroups.map((group) => (
-            <div key={group.datasetId}>
-              <p className="mb-2 text-sm font-medium text-gray-700">
-                {group.datasetName} ({group.buildings.length})
+        <>
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by building name…"
+              aria-label="Search buildings"
+              className="flex-1 sm:max-w-xs"
+            />
+            <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={allVisibleSelected ? deselectAllVisible : selectAllVisible}
+                disabled={visibleIds.length === 0}
+              >
+                {allVisibleSelected ? "Deselect all" : "Select all"}
+              </Button>
+              <p className="whitespace-nowrap text-sm text-muted">
+                {selectedIds.size} of {totalBuildings} selected
               </p>
-              <ul className="divide-y divide-gray-200 rounded border border-gray-200">
-                {group.buildings.map((b) => {
-                  const checked = selectedIds.has(b.id);
-                  return (
-                    <li key={b.id}>
-                      <label
-                        className={`flex cursor-pointer items-center gap-3 px-4 py-2 text-sm ${
-                          checked ? "bg-gray-50" : ""
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleSelected(b.id)}
-                        />
-                        <span className="flex-1">
-                          <span className="font-medium">{b.name}</span>
-                          {b.address && <span className="ml-2 text-gray-500">{b.address}</span>}
-                        </span>
-                      </label>
-                    </li>
-                  );
-                })}
-              </ul>
             </div>
-          ))}
+          </div>
+
+          {filteredGroups.length === 0 ? (
+            <EmptyState title="No buildings match your search" description="Try a different building name." />
+          ) : (
+            <div className="flex flex-col gap-6">
+              {filteredGroups.map((group) => (
+                <div key={group.datasetId}>
+                  <p className="mb-2 text-sm font-medium text-foreground">
+                    {group.datasetName} ({group.buildings.length})
+                  </p>
+                  <ul className="divide-y divide-border rounded border border-border">
+                    {group.buildings.map((b) => {
+                      const checked = selectedIds.has(b.id);
+                      return (
+                        <li key={b.id}>
+                          <label
+                            className={`flex cursor-pointer items-center gap-3 px-4 py-2 text-sm ${
+                              checked ? "bg-accent-subtle" : ""
+                            }`}
+                          >
+                            <input type="checkbox" checked={checked} onChange={() => toggleSelected(b.id)} />
+                            <span className="flex-1">
+                              <span className="font-medium">{b.name}</span>
+                              {b.address && <span className="ml-2 text-muted">{b.address}</span>}
+                            </span>
+                          </label>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {formError && (
+        <div className="mt-4">
+          <ErrorState message={formError} />
         </div>
       )}
 
-      {formError && <p className="mt-4 text-sm text-red-600">{formError}</p>}
-
       <div className="mt-6 flex items-center gap-3">
-        <Link
-          href={`/campaigns/${campaignId}/datasets`}
-          className="rounded border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
-        >
-          Back
+        <Link href={`/campaigns/${campaignId}/datasets`}>
+          <Button type="button" variant="secondary">
+            Back
+          </Button>
         </Link>
-        <button
-          type="button"
-          onClick={handleContinue}
-          disabled={submitting}
-          className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
+        <Button type="button" onClick={handleContinue} isLoading={submitting}>
           {submitting ? "Saving…" : "Continue"}
-        </button>
+        </Button>
       </div>
-    </div>
+    </WizardShell>
   );
 }

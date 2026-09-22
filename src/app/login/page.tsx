@@ -3,6 +3,9 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser-client";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { ErrorState } from "@/components/ui/error-state";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -34,50 +37,41 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex flex-1 items-center justify-center px-4 py-16">
+    <div className="flex flex-1 items-center justify-center bg-background px-4 py-16">
       <div className="w-full max-w-sm">
-        <h1 className="mb-6 text-xl font-semibold">CLZ Marketing — Staff Login</h1>
+        <div className="mb-8 flex items-center gap-2.5">
+          <span className="h-6 w-6 shrink-0 rounded-[7px] bg-primary" aria-hidden />
+          <span className="text-sm font-semibold tracking-tight text-foreground">CLZ Marketing OS</span>
+        </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
-            <label htmlFor="email" className="text-sm font-medium">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              required
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
-            />
-          </div>
+        <h1 className="mb-1.5 text-[1.75rem] font-semibold tracking-tight text-foreground">Sign in</h1>
+        <p className="mb-8 text-sm text-secondary">Staff access to the marketing operating system.</p>
 
-          <div className="flex flex-col gap-1">
-            <label htmlFor="password" className="text-sm font-medium">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="rounded border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
-            />
-          </div>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+          <Input
+            id="email"
+            label="Email"
+            type="email"
+            required
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <Input
+            id="password"
+            label="Password"
+            type="password"
+            required
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <ErrorState message={error} />}
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className="mt-2 rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
-          >
+          <Button type="submit" isLoading={submitting} className="mt-1 w-full">
             {submitting ? "Signing in…" : "Sign in"}
-          </button>
+          </Button>
         </form>
       </div>
     </div>

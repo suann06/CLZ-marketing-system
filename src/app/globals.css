@@ -1,23 +1,45 @@
 @import "tailwindcss";
 
-/* Phase 4A design tokens. Additive to the original 2-token system
-   (--background/--foreground) — nothing existing was removed, so any
-   class using those two tokens keeps working unchanged. */
+/* Dark Olive Luxury — the canonical and only theme (Phase 6 visual
+   migration to the approved Stitch design system). Same variable names/
+   architecture as Phase 5 (:root -> @theme inline), so every existing
+   Tailwind utility class (bg-surface, text-muted, bg-primary,
+   border-border, etc.) keeps working unchanged across all existing
+   components — only the token VALUES change, plus two new token PAIRS
+   (--ai/--ai-subtle, --surface-raised/--surface-sunken) for roles Stitch's
+   design has that Phase 5's simpler 2-level surface system didn't.
+   Values are taken directly from the approved Stitch "Overview Dashboard —
+   Dark Olive Luxury" screen's own tailwind.config token block, not
+   invented. There is no light variant anymore and no toggle — the
+   previous light palette and the old opt-in :root[data-theme="dark"]
+   block have both been retired; see the approved implementation plan. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --surface: #ffffff;
-  --surface-muted: #f9fafb;
-  --border: #e5e7eb;
-  --primary: #111827;
-  --primary-foreground: #ffffff;
-  --success: #16a34a;
-  --success-bg: #dcfce7;
-  --warning: #b45309;
-  --warning-bg: #fef3c7;
-  --error: #dc2626;
-  --error-bg: #fee2e2;
-  --muted: #6b7280;
+  --background: #0c0f0d; /* near-black page canvas */
+  --foreground: #f5f6f2; /* warm white primary text */
+  --surface: #121613; /* card/component background (Stitch surface-container-low) */
+  --surface-muted: #080a09; /* deepest recess — sidebar, topbar, table headers, inset wells (Stitch surface-container-lowest) */
+  --surface-sunken: #171c18; /* nested tiles-within-a-card — KPI sub-tiles, funnel stage boxes (Stitch surface-container) */
+  --surface-raised: #1d231e; /* hover state on cards/rows, active nav item (Stitch surface-container-high) */
+  --border: #232e22; /* olive-tinted hairline — card/table borders */
+  --border-strong: #2b392a; /* input resting border, interactive-button border */
+  --primary: #84a581; /* the one brand accent — olive */
+  --primary-hover: #9fc29b;
+  --primary-foreground: #0c130d; /* near-black text on olive fills */
+  --accent-subtle: #243423; /* selected-row tint, active nav background, insight panels */
+  --accent-ink: #d3e7d1; /* text color used on top of accent-subtle fills */
+  --success: #84a581; /* olive doubles as the positive/growth color in this system */
+  --success-bg: #1f2b1d;
+  --warning: #ecc15a;
+  --warning-bg: #2d2716;
+  --error: #f0857a;
+  --error-bg: #3a1815;
+  --secondary: #c5ccc4; /* body/description-tier text (Stitch on-surface-variant) */
+  --muted: #7f887e; /* tertiary/meta text — timestamps, placeholders, captions (Stitch outline) */
+  --ai: #cebdff; /* muted purple — reserved for AI-scoped functionality only, never general UI */
+  --ai-subtle: #3d325e; /* container/background for AI-scoped accents */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-hover: 0 10px 28px rgba(0, 0, 0, 0.5);
+  --shadow-elevated: 0 24px 60px rgba(0, 0, 0, 0.6);
 }
 
 @theme inline {
@@ -25,41 +47,80 @@
   --color-foreground: var(--foreground);
   --color-surface: var(--surface);
   --color-surface-muted: var(--surface-muted);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-raised: var(--surface-raised);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
   --color-primary-foreground: var(--primary-foreground);
+  --color-accent-subtle: var(--accent-subtle);
+  --color-accent-ink: var(--accent-ink);
   --color-success: var(--success);
   --color-success-bg: var(--success-bg);
   --color-warning: var(--warning);
   --color-warning-bg: var(--warning-bg);
   --color-error: var(--error);
   --color-error-bg: var(--error-bg);
+  --color-secondary: var(--secondary);
   --color-muted: var(--muted);
-  --font-sans: var(--font-geist-sans);
+  --color-ai: var(--ai);
+  --color-ai-subtle: var(--ai-subtle);
+  --font-sans: var(--font-plus-jakarta-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-    --surface: #111113;
-    --surface-muted: #1a1a1d;
-    --border: #27272a;
-    --primary: #f4f4f5;
-    --primary-foreground: #111113;
-    --success: #4ade80;
-    --success-bg: #052e16;
-    --warning: #fbbf24;
-    --warning-bg: #451a03;
-    --error: #f87171;
-    --error-bg: #450a0a;
-    --muted: #a1a1aa;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Shadow utilities — Tailwind v4's default shadow-* scale doesn't match
+   the restrained three-level system the spec calls for, so these are
+   defined directly rather than fighting the default scale with arbitrary
+   values at every call site. Cards themselves lean on --border for
+   elevation (Stitch is border-first, not shadow-first); these remain for
+   floating surfaces — dropdown, modal, toast, tooltip — that need to lift
+   off the dark canvas. */
+.shadow-card {
+  box-shadow: var(--shadow-card);
+}
+.shadow-hover {
+  box-shadow: var(--shadow-hover);
+}
+.shadow-elevated {
+  box-shadow: var(--shadow-elevated);
+}
+
+/* Motion primitives — plain CSS keyframes (no animation dependency
+   installed in this project). 150-250ms, ease-out, felt rather than
+   seen — see the approved visual identity spec's motion section. */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.anim-fade { animation: fade-in 200ms ease-out; }
+.anim-scale-in { animation: scale-in 200ms ease-out; }
+.anim-rise-in { animation: rise-in 150ms ease-out; }
+.anim-slide-in-right { animation: slide-in-right 220ms ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

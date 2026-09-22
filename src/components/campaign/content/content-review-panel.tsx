@@ -225,9 +225,9 @@ export function ContentReviewPanel({
           <div className="flex flex-col gap-6">
             {PLATFORMS.map((platform) => (
               <Card key={platform} title={`${PLATFORM_LABELS[platform]} (${content[platform].length})`}>
-                <div className="flex flex-col gap-4">
+                <div className="divide-y divide-border">
                   {content[platform].map((variant, i) => (
-                    <div key={i} className="rounded border border-border p-3">
+                    <div key={i} className={i === 0 ? "pb-4" : "py-4"}>
                       <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">
                         {variant.variantLabel}
                       </p>
@@ -238,11 +238,11 @@ export function ContentReviewPanel({
                         <p className="mb-2 text-sm text-muted">{variant.hashtags.join(" ")}</p>
                       )}
                       {variant.notes && (
-                        <div className="mt-2 rounded bg-warning-bg p-2">
+                        <div className="mt-2 border-l-2 border-warning pl-3">
                           <p className="text-xs font-medium uppercase tracking-wide text-warning">
                             Internal note — not customer-facing
                           </p>
-                          <p className="text-xs text-warning">{variant.notes}</p>
+                          <p className="text-xs text-secondary">{variant.notes}</p>
                         </div>
                       )}
                     </div>

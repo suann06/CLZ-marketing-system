@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getCampaignDetail, CampaignNotFoundError } from "@/server/services/campaign-service";
 import { DifferentiatorsStep } from "@/components/campaign/wizard/differentiators-step";
+import { computeCompletedSteps } from "@/components/campaign/wizard/wizard-steps";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,7 @@ export default async function CampaignDifferentiatorsPage({
       campaignId={campaignId}
       campaignName={detail.campaign.name}
       initialDifferentiators={initialDifferentiators}
+      completedSteps={computeCompletedSteps(detail)}
     />
   );
 }

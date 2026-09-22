@@ -8,7 +8,6 @@ import {
   type MarketingStrategyOutput,
 } from "@/server/ai/schemas/marketing-strategy-output";
 import { GenerateContentButton } from "@/components/campaign/content/generate-content-button";
-import { PageContainer } from "@/components/layout/page-container";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -177,70 +176,77 @@ export function StrategyReviewPanel({
   }
 
   return (
-    <PageContainer maxWidth="max-w-3xl">
-      <div className="mb-6 flex items-center gap-3">
-        <h2 className="text-lg font-semibold">Strategy</h2>
+    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:px-8">
+      <div className="mb-8 flex items-center gap-3">
+        <h2 className="text-lg font-semibold text-foreground">Strategy</h2>
         <span className="text-sm text-muted">Version {version}</span>
         <Badge status={status}>{status}</Badge>
       </div>
 
       {mode === "view" ? (
         <>
-          <div className="flex flex-col gap-6">
-            <Card title="Target Audience">
-              <p className="mb-2 text-sm">{content.targetAudience.description}</p>
-              <ul className="list-inside list-disc text-sm text-muted">
+          <div className="flex flex-col divide-y divide-border">
+            <section className="pb-7">
+              <h3 className="mb-2.5 text-sm font-semibold text-foreground">Target audience</h3>
+              <p className="mb-2 text-sm text-secondary">{content.targetAudience.description}</p>
+              <ul className="list-inside list-disc text-sm text-secondary">
                 {content.targetAudience.segments.map((s, i) => (
                   <li key={i}>{s}</li>
                 ))}
               </ul>
-            </Card>
+            </section>
 
-            <Card title="Customer Needs">
-              <ul className="list-inside list-disc text-sm text-muted">
+            <section className="py-7">
+              <h3 className="mb-2.5 text-sm font-semibold text-foreground">Customer needs</h3>
+              <ul className="list-inside list-disc text-sm text-secondary">
                 {content.customerNeeds.map((n, i) => (
                   <li key={i}>{n}</li>
                 ))}
               </ul>
-            </Card>
+            </section>
 
-            <Card title="Positioning">
-              <p className="text-sm text-muted">{content.positioning}</p>
-            </Card>
+            <section className="py-7">
+              <h3 className="mb-2.5 text-sm font-semibold text-foreground">Positioning</h3>
+              <p className="text-sm text-secondary">{content.positioning}</p>
+            </section>
 
-            <Card title="Marketing Angles">
-              <ul className="list-inside list-disc text-sm text-muted">
+            <section className="py-7">
+              <h3 className="mb-2.5 text-sm font-semibold text-foreground">Marketing angles</h3>
+              <ul className="list-inside list-disc text-sm text-secondary">
                 {content.marketingAngles.map((a, i) => (
                   <li key={i}>{a}</li>
                 ))}
               </ul>
-            </Card>
+            </section>
 
-            <Card title="Messaging Pillars">
+            <section className="py-7">
+              <h3 className="mb-3 text-sm font-semibold text-foreground">Messaging pillars</h3>
               <div className="flex flex-col gap-3">
                 {content.messagingPillars.map((p, i) => (
                   <div key={i}>
                     <p className="text-sm font-medium text-foreground">{p.title}</p>
-                    <p className="text-sm text-muted">{p.description}</p>
+                    <p className="text-sm text-secondary">{p.description}</p>
                   </div>
                 ))}
               </div>
-            </Card>
+            </section>
 
-            <Card title="Platform Direction">
+            <section className="py-7">
+              <h3 className="mb-3 text-sm font-semibold text-foreground">Platform direction</h3>
               <div className="flex flex-col gap-3">
                 {content.platformDirection.map((p, i) => (
                   <div key={i}>
                     <p className="text-sm font-medium capitalize text-foreground">{p.platform}</p>
-                    <p className="text-sm text-muted">{p.direction}</p>
+                    <p className="text-sm text-secondary">{p.direction}</p>
                   </div>
                 ))}
               </div>
-            </Card>
+            </section>
 
-            <Card title="CTA">
-              <p className="text-sm text-muted">{content.cta}</p>
-            </Card>
+            <section className="pt-7">
+              <h3 className="mb-2.5 text-sm font-semibold text-foreground">Call to action</h3>
+              <p className="text-sm text-secondary">{content.cta}</p>
+            </section>
           </div>
 
           {formError && <p className="mt-4 text-sm text-error">{formError}</p>}
@@ -463,6 +469,6 @@ export function StrategyReviewPanel({
           </div>
         </div>
       )}
-    </PageContainer>
+    </div>
   );
 }
